@@ -1,0 +1,336 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id                     Int                     @id @default(autoincrement())
+  nombre                 String                  @db.VarChar(150)
+  correo                 String                  @unique @db.VarChar(255)
+  passwordHash           String                  @map("password_hash") @db.VarChar(255)
+  activo                 Boolean                 @default(true)
+  ultimoAcceso           DateTime?               @map("ultimo_acceso")
+  createdAt              DateTime                @default(now()) @map("created_at")
+  updatedAt              DateTime                @updatedAt @map("updated_at")
+  roles                  UsuarioRol[]
+  casosReportados        CasiAccidente[]         @relation("CasoReportadoPor")
+  validaciones           ValidacionProcedencia[] @relation("ValidacionRealizadaPor")
+  accionesAsignadas      AccionCorrectiva[]      @relation("ResponsableAccion")
+  evidenciasSubidas      Evidencia[]             @relation("EvidenciaSubidaPor")
+  registrosBitacora      BitacoraCaso[]          @relation("BitacoraRegistradaPor")
+  notificaciones         Notificacion[]
+  comentariosObservacion ComentarioObservacion[] @relation("ComentarioRealizadoPor")
+
+  @@map("usuarios")
+}
+
+model Rol {
+  id          Int          @id @default(autoincrement())
+  nombre      String       @unique @db.VarChar(100)
+  descripcion String?      @db.VarChar(255)
+  activo      Boolean      @default(true)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  usuarios    UsuarioRol[]
+
+  @@map("roles")
+}
+
+model UsuarioRol {
+  id         Int      @id @default(autoincrement())
+  usuarioId  Int      @map("usuario_id")
+  rolId      Int      @map("rol_id")
+  asignadoAt DateTime @default(now()) @map("asignado_at")
+  usuario    Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  rol        Rol      @relation(fields: [rolId], references: [id], onDelete: Restrict)
+
+  @@unique([usuarioId, rolId])
+  @@index([rolId])
+  @@map("usuarios_roles")
+}
+
+model Area {
+  id          Int             @id @default(autoincrement())
+  nombre      String          @unique @db.VarChar(120)
+  descripcion String?         @db.VarChar(255)
+  activo      Boolean         @default(true)
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  procesos    Proceso[]
+  casos       CasiAccidente[]
+
+  @@map("areas")
+}
+
+model Proceso {
+  id          Int             @id @default(autoincrement())
+  areaId      Int             @map("area_id")
+  nombre      String          @db.VarChar(150)
+  descripcion String?         @db.VarChar(255)
+  activo      Boolean         @default(true)
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  area        Area            @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  casos       CasiAccidente[]
+
+  @@unique([areaId, nombre])
+  @@index([areaId])
+  @@map("procesos")
+}
+
+model TipoEvento {
+  id          Int             @id @default(autoincrement())
+  nombre      String          @unique @db.VarChar(120)
+  descripcion String?         @db.VarChar(255)
+  activo      Boolean         @default(true)
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  casos       CasiAccidente[]
+
+  @@map("tipos_evento")
+}
+
+model Criticidad {
+  id          Int             @id @default(autoincrement())
+  nombre      String          @unique @db.VarChar(50)
+  descripcion String?         @db.VarChar(255)
+  color       String?         @db.VarChar(20)
+  orden       Int             @unique
+  activo      Boolean         @default(true)
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  casos       CasiAccidente[]
+
+  @@map("criticidades")
+}
+
+model EstadoCaso {
+  id               Int             @id @default(autoincrement())
+  nombre           String          @unique @db.VarChar(80)
+  descripcion      String?         @db.VarChar(255)
+  orden            Int             @unique
+  esFinal          Boolean         @default(false) @map("es_final")
+  activo           Boolean         @default(true)
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+  casos            CasiAccidente[]
+  bitacorasOrigen  BitacoraCaso[]  @relation("EstadoAnteriorBitacora")
+  bitacorasDestino BitacoraCaso[]  @relation("EstadoNuevoBitacora")
+
+  @@map("estados_caso")
+}
+
+model EstadoAccion {
+  id          Int                @id @default(autoincrement())
+  nombre      String             @unique @db.VarChar(80)
+  descripcion String?            @db.VarChar(255)
+  orden       Int                @unique
+  esFinal     Boolean            @default(false) @map("es_final")
+  activo      Boolean            @default(true)
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+  acciones    AccionCorrectiva[]
+
+  @@map("estados_accion")
+}
+
+model CasiAccidente {
+  id                      Int                     @id @default(autoincrement())
+  correlativo             String                  @unique @db.VarChar(30)
+  titulo                  String                  @db.VarChar(200)
+  descripcion             String                  @db.Text
+  fechaHoraEvento         DateTime                @map("fecha_hora_evento")
+  fechaReporte            DateTime                @default(now()) @map("fecha_reporte")
+  ubicacion               String?                 @db.VarChar(255)
+  areaId                  Int                     @map("area_id")
+  procesoId               Int                     @map("proceso_id")
+  tipoEventoId            Int                     @map("tipo_evento_id")
+  criticidadId            Int                     @map("criticidad_id")
+  estadoCasoId            Int                     @map("estado_caso_id")
+  reportadoPorId          Int                     @map("reportado_por_id")
+  createdAt               DateTime                @default(now()) @map("created_at")
+  updatedAt               DateTime                @updatedAt @map("updated_at")
+  area                    Area                    @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  proceso                 Proceso                 @relation(fields: [procesoId], references: [id], onDelete: Restrict)
+  tipoEvento              TipoEvento              @relation(fields: [tipoEventoId], references: [id], onDelete: Restrict)
+  criticidad              Criticidad              @relation(fields: [criticidadId], references: [id], onDelete: Restrict)
+  estadoCaso              EstadoCaso              @relation(fields: [estadoCasoId], references: [id], onDelete: Restrict)
+  reportadoPor            Usuario                 @relation("CasoReportadoPor", fields: [reportadoPorId], references: [id], onDelete: Restrict)
+  reporteInicial          ReporteInicial?
+  validacionesProcedencia ValidacionProcedencia[]
+  divulgaciones           DivulgacionCaso[]
+  accionesCorrectivas     AccionCorrectiva[]
+  evidencias              Evidencia[]
+  bitacora                BitacoraCaso[]
+  notificaciones          Notificacion[]
+  comentariosObservacion  ComentarioObservacion[]
+
+  @@index([areaId])
+  @@index([procesoId])
+  @@index([tipoEventoId])
+  @@index([criticidadId])
+  @@index([estadoCasoId])
+  @@index([reportadoPorId])
+  @@index([fechaReporte])
+  @@map("casi_accidentes")
+}
+
+model ReporteInicial {
+  id                   Int           @id @default(autoincrement())
+  casiAccidenteId      Int           @unique @map("casi_accidente_id")
+  descripcionDetallada String?       @map("descripcion_detallada") @db.Text
+  condicionDetectada   String?       @map("condicion_detectada") @db.Text
+  accionInmediata      String?       @map("accion_inmediata") @db.Text
+  observaciones        String?       @db.Text
+  personasInvolucradas String?       @map("personas_involucradas") @db.Text
+  medidasInmediatas    String?       @map("medidas_inmediatas") @db.Text
+  huboLesion           Boolean       @default(false) @map("hubo_lesion")
+  huboDanoMaterial     Boolean       @default(false) @map("hubo_dano_material")
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+  casiAccidente        CasiAccidente @relation(fields: [casiAccidenteId], references: [id], onDelete: Cascade)
+
+  @@map("reportes_iniciales")
+}
+
+model ValidacionProcedencia {
+  id              Int           @id @default(autoincrement())
+  casiAccidenteId Int           @map("casi_accidente_id")
+  validadorId     Int           @map("validador_id")
+  procedente      Boolean
+  resultado       String        @db.VarChar(50)
+  observacion     String?       @db.Text
+  fechaValidacion DateTime      @default(now()) @map("fecha_validacion")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  casiAccidente   CasiAccidente @relation(fields: [casiAccidenteId], references: [id], onDelete: Cascade)
+  validador       Usuario       @relation("ValidacionRealizadaPor", fields: [validadorId], references: [id], onDelete: Restrict)
+
+  @@index([casiAccidenteId])
+  @@index([validadorId])
+  @@map("validaciones_procedencia")
+}
+
+model DivulgacionCaso {
+  id               Int           @id @default(autoincrement())
+  casiAccidenteId  Int           @map("casi_accidente_id")
+  fechaDivulgacion DateTime      @map("fecha_divulgacion")
+  medio            String        @db.VarChar(100)
+  audiencia        String?       @db.VarChar(255)
+  descripcion      String?       @db.Text
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+  casiAccidente    CasiAccidente @relation(fields: [casiAccidenteId], references: [id], onDelete: Cascade)
+
+  @@index([casiAccidenteId])
+  @@map("divulgaciones_caso")
+}
+
+model AccionCorrectiva {
+  id               Int           @id @default(autoincrement())
+  casiAccidenteId  Int           @map("casi_accidente_id")
+  responsableId    Int           @map("responsable_id")
+  estadoAccionId   Int           @map("estado_accion_id")
+  titulo           String        @db.VarChar(200)
+  descripcion      String        @db.Text
+  fechaCompromiso  DateTime      @map("fecha_compromiso")
+  fechaCierre      DateTime?     @map("fecha_cierre")
+  porcentajeAvance Int           @default(0) @map("porcentaje_avance")
+  observacion      String?       @db.Text
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+  casiAccidente    CasiAccidente @relation(fields: [casiAccidenteId], references: [id], onDelete: Cascade)
+  responsable      Usuario       @relation("ResponsableAccion", fields: [responsableId], references: [id], onDelete: Restrict)
+  estadoAccion     EstadoAccion  @relation(fields: [estadoAccionId], references: [id], onDelete: Restrict)
+  evidencias       Evidencia[]
+
+  @@index([casiAccidenteId])
+  @@index([responsableId])
+  @@index([estadoAccionId])
+  @@index([fechaCompromiso])
+  @@map("acciones_correctivas")
+}
+
+model Evidencia {
+  id                 Int               @id @default(autoincrement())
+  casiAccidenteId    Int               @map("casi_accidente_id")
+  accionCorrectivaId Int?              @map("accion_correctiva_id")
+  subidoPorId        Int?              @map("subido_por_id")
+  nombreArchivo      String            @map("nombre_archivo") @db.VarChar(255)
+  nombreAlmacenado   String            @map("nombre_almacenado") @db.VarChar(255)
+  rutaArchivo        String            @map("ruta_archivo") @db.VarChar(500)
+  tipoMime           String?           @map("tipo_mime") @db.VarChar(100)
+  tamanoBytes        Int?              @map("tamano_bytes")
+  descripcion        String?           @db.Text
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+  casiAccidente      CasiAccidente     @relation(fields: [casiAccidenteId], references: [id], onDelete: Cascade)
+  accionCorrectiva   AccionCorrectiva? @relation(fields: [accionCorrectivaId], references: [id], onDelete: Cascade)
+  subidoPor          Usuario?          @relation("EvidenciaSubidaPor", fields: [subidoPorId], references: [id], onDelete: SetNull)
+
+  @@index([casiAccidenteId])
+  @@index([accionCorrectivaId])
+  @@index([subidoPorId])
+  @@map("evidencias")
+}
+
+model BitacoraCaso {
+  id               Int           @id @default(autoincrement())
+  casiAccidenteId  Int           @map("casi_accidente_id")
+  usuarioId        Int           @map("usuario_id")
+  estadoAnteriorId Int?          @map("estado_anterior_id")
+  estadoNuevoId    Int?          @map("estado_nuevo_id")
+  accionRealizada  String        @map("accion_realizada") @db.VarChar(150)
+  observacion      String?       @db.Text
+  fecha            DateTime      @default(now())
+  createdAt        DateTime      @default(now()) @map("created_at")
+  casiAccidente    CasiAccidente @relation(fields: [casiAccidenteId], references: [id], onDelete: Cascade)
+  usuario          Usuario       @relation("BitacoraRegistradaPor", fields: [usuarioId], references: [id], onDelete: Restrict)
+  estadoAnterior   EstadoCaso?   @relation("EstadoAnteriorBitacora", fields: [estadoAnteriorId], references: [id], onDelete: Restrict)
+  estadoNuevo      EstadoCaso?   @relation("EstadoNuevoBitacora", fields: [estadoNuevoId], references: [id], onDelete: Restrict)
+
+  @@index([casiAccidenteId, fecha])
+  @@index([usuarioId])
+  @@index([estadoAnteriorId])
+  @@index([estadoNuevoId])
+  @@map("bitacora_casos")
+}
+
+model Notificacion {
+  id              Int            @id @default(autoincrement())
+  usuarioId       Int            @map("usuario_id")
+  casiAccidenteId Int?           @map("casi_accidente_id")
+  tipo            String?        @db.VarChar(80)
+  titulo          String         @db.VarChar(200)
+  mensaje         String         @db.Text
+  leida           Boolean        @default(false)
+  fechaLectura    DateTime?      @map("fecha_lectura")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  usuario         Usuario        @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  casiAccidente   CasiAccidente? @relation(fields: [casiAccidenteId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId, leida])
+  @@index([casiAccidenteId])
+  @@map("notificaciones")
+}
+
+model ComentarioObservacion {
+  id              Int           @id @default(autoincrement())
+  casiAccidenteId Int           @map("casi_accidente_id")
+  usuarioId       Int           @map("usuario_id")
+  comentario      String        @db.Text
+  resuelto        Boolean       @default(false)
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  casiAccidente   CasiAccidente @relation(fields: [casiAccidenteId], references: [id], onDelete: Cascade)
+  usuario         Usuario       @relation("ComentarioRealizadoPor", fields: [usuarioId], references: [id], onDelete: Restrict)
+
+  @@index([casiAccidenteId])
+  @@index([usuarioId])
+  @@map("comentarios_observacion")
+}

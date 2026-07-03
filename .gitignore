@@ -1,0 +1,25 @@
+
+# Dependencias
+node_modules/
+backend/node_modules/
+
+# Variables de entorno
+.env
+backend/.env
+
+# Archivos subidos
+uploads/evidencias/*
+backend/uploads/evidencias/*
+!uploads/evidencias/.gitkeep
+!backend/uploads/evidencias/.gitkeep
+
+# Builds
+dist/
+backend/dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Sistema
+.DS_Store

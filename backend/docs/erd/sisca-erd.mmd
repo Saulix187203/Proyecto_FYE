@@ -1,0 +1,237 @@
+erDiagram
+    Usuario {
+        Int id PK
+        String nombre
+        String correo UK
+        String passwordHash
+        Boolean activo
+        DateTime ultimoAcceso "nullable"
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    Rol {
+        Int id PK
+        String nombre UK
+        String descripcion "nullable"
+        Boolean activo
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    UsuarioRol {
+        Int id PK
+        Int usuarioId FK
+        Int rolId FK
+        DateTime asignadoAt
+    }
+
+    Area {
+        Int id PK
+        String nombre UK
+        String descripcion "nullable"
+        Boolean activo
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    Proceso {
+        Int id PK
+        Int areaId FK
+        String nombre
+        String descripcion "nullable"
+        Boolean activo
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    TipoEvento {
+        Int id PK
+        String nombre UK
+        String descripcion "nullable"
+        Boolean activo
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    Criticidad {
+        Int id PK
+        String nombre UK
+        String descripcion "nullable"
+        String color "nullable"
+        Int orden UK
+        Boolean activo
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    EstadoCaso {
+        Int id PK
+        String nombre UK
+        String descripcion "nullable"
+        Int orden UK
+        Boolean esFinal
+        Boolean activo
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    EstadoAccion {
+        Int id PK
+        String nombre UK
+        String descripcion "nullable"
+        Int orden UK
+        Boolean esFinal
+        Boolean activo
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    CasiAccidente {
+        Int id PK
+        String correlativo UK
+        String titulo
+        String descripcion
+        DateTime fechaHoraEvento
+        DateTime fechaReporte
+        String ubicacion "nullable"
+        Int areaId FK
+        Int procesoId FK
+        Int tipoEventoId FK
+        Int criticidadId FK
+        Int estadoCasoId FK
+        Int reportadoPorId FK
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    ReporteInicial {
+        Int id PK
+        Int casiAccidenteId FK "unique"
+        String descripcionDetallada "nullable"
+        String condicionDetectada "nullable"
+        String accionInmediata "nullable"
+        String observaciones "nullable"
+        String personasInvolucradas "nullable"
+        String medidasInmediatas "nullable"
+        Boolean huboLesion
+        Boolean huboDanoMaterial
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    ValidacionProcedencia {
+        Int id PK
+        Int casiAccidenteId FK
+        Int validadorId FK
+        Boolean procedente
+        String resultado
+        String observacion "nullable"
+        DateTime fechaValidacion
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    DivulgacionCaso {
+        Int id PK
+        Int casiAccidenteId FK
+        DateTime fechaDivulgacion
+        String medio
+        String audiencia "nullable"
+        String descripcion "nullable"
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    AccionCorrectiva {
+        Int id PK
+        Int casiAccidenteId FK
+        Int responsableId FK
+        Int estadoAccionId FK
+        String titulo
+        String descripcion
+        DateTime fechaCompromiso
+        DateTime fechaCierre "nullable"
+        Int porcentajeAvance
+        String observacion "nullable"
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    Evidencia {
+        Int id PK
+        Int casiAccidenteId FK
+        Int accionCorrectivaId FK "nullable"
+        Int subidoPorId FK "nullable"
+        String nombreArchivo
+        String nombreAlmacenado
+        String rutaArchivo
+        String tipoMime "nullable"
+        Int tamanoBytes "nullable"
+        String descripcion "nullable"
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    BitacoraCaso {
+        Int id PK
+        Int casiAccidenteId FK
+        Int usuarioId FK
+        Int estadoAnteriorId FK "nullable"
+        Int estadoNuevoId FK "nullable"
+        String accionRealizada
+        String observacion "nullable"
+        DateTime fecha
+        DateTime createdAt
+    }
+
+    Notificacion {
+        Int id PK
+        Int usuarioId FK
+        Int casiAccidenteId FK "nullable"
+        String tipo "nullable"
+        String titulo
+        String mensaje
+        Boolean leida
+        DateTime fechaLectura "nullable"
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    ComentarioObservacion {
+        Int id PK
+        Int casiAccidenteId FK
+        Int usuarioId FK
+        String comentario
+        Boolean resuelto
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    Usuario ||--o{ UsuarioRol : asignaciones
+    Rol ||--o{ UsuarioRol : asignaciones
+    Area ||--o{ Proceso : contiene
+    Area ||--o{ CasiAccidente : clasifica
+    Proceso ||--o{ CasiAccidente : agrupa
+    TipoEvento ||--o{ CasiAccidente : tipifica
+    Criticidad ||--o{ CasiAccidente : prioriza
+    EstadoCaso ||--o{ CasiAccidente : estado_actual
+    Usuario ||--o{ CasiAccidente : reporta
+    CasiAccidente ||--o| ReporteInicial : posee
+    CasiAccidente ||--o{ ValidacionProcedencia : recibe
+    Usuario ||--o{ ValidacionProcedencia : valida
+    CasiAccidente ||--o{ DivulgacionCaso : divulga
+    CasiAccidente ||--o{ AccionCorrectiva : requiere
+    Usuario ||--o{ AccionCorrectiva : responsable
+    EstadoAccion ||--o{ AccionCorrectiva : estado_actual
+    CasiAccidente ||--o{ Evidencia : adjunta
+    AccionCorrectiva o|--o{ Evidencia : respalda
+    Usuario o|--o{ Evidencia : sube
+    CasiAccidente ||--o{ BitacoraCaso : registra
+    Usuario ||--o{ BitacoraCaso : realiza
+    EstadoCaso o|--o{ BitacoraCaso : estado_anterior
+    EstadoCaso o|--o{ BitacoraCaso : estado_nuevo
+    Usuario ||--o{ Notificacion : recibe
+    CasiAccidente o|--o{ Notificacion : origina
+    CasiAccidente ||--o{ ComentarioObservacion : contiene
+    Usuario ||--o{ ComentarioObservacion : comenta

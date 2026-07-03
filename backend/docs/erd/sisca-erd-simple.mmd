@@ -1,0 +1,34 @@
+erDiagram
+    Usuario ||--o{ UsuarioRol : tiene
+    Rol ||--o{ UsuarioRol : asigna
+
+    Area ||--o{ Proceso : contiene
+    Area ||--o{ CasiAccidente : clasifica
+    Proceso ||--o{ CasiAccidente : agrupa
+    TipoEvento ||--o{ CasiAccidente : tipifica
+    Criticidad ||--o{ CasiAccidente : prioriza
+    EstadoCaso ||--o{ CasiAccidente : estado
+    Usuario ||--o{ CasiAccidente : reporta
+
+    CasiAccidente ||--o| ReporteInicial : posee
+    CasiAccidente ||--o{ ValidacionProcedencia : recibe
+    Usuario ||--o{ ValidacionProcedencia : valida
+    CasiAccidente ||--o{ DivulgacionCaso : divulga
+
+    CasiAccidente ||--o{ AccionCorrectiva : requiere
+    Usuario ||--o{ AccionCorrectiva : responsable
+    EstadoAccion ||--o{ AccionCorrectiva : estado
+
+    CasiAccidente ||--o{ Evidencia : adjunta
+    AccionCorrectiva o|--o{ Evidencia : respalda
+    Usuario o|--o{ Evidencia : sube
+
+    CasiAccidente ||--o{ BitacoraCaso : registra
+    Usuario ||--o{ BitacoraCaso : realiza
+    EstadoCaso o|--o{ BitacoraCaso : anterior
+    EstadoCaso o|--o{ BitacoraCaso : nuevo
+
+    Usuario ||--o{ Notificacion : recibe
+    CasiAccidente o|--o{ Notificacion : origina
+    CasiAccidente ||--o{ ComentarioObservacion : contiene
+    Usuario ||--o{ ComentarioObservacion : comenta
