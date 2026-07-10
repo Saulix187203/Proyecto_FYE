@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "@angular/animations": "^22.0.5",
+    "@angular/cdk": "^22.0.3",
+    "@angular/material": "^22.0.3",
+    "chart.js": "^4.5.1",
+    "ng2-charts": "^10.0.0"
+  }
+}
