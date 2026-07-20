@@ -1,9 +1,9 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../../../environments/environment';
 import { ApiResponse } from '../../../core/models/api-response.model';
 import { Caso } from '../../../core/models/caso.model';
-import { environment } from '../../../../environments/environment';
 
 export interface FiltrosCasos {
   estado?: string | number;
@@ -31,8 +31,9 @@ export class CasosService {
     return this.http.get<ApiResponse<Caso[]>>(`${environment.apiUrl}/casos`, { params });
   }
 
-  obtenerCaso(id: number): Observable<ApiResponse<Caso>> {
-    return this.http.get<ApiResponse<Caso>>(`${environment.apiUrl}/casos/${id}`);
+  // IMPORTANTE: El backend devuelve { caso: Caso } dentro de data
+  obtenerCaso(id: number): Observable<ApiResponse<{ caso: Caso }>> {
+    return this.http.get<ApiResponse<{ caso: Caso }>>(`${environment.apiUrl}/casos/${id}`);
   }
 
   crearCaso(data: any): Observable<ApiResponse<{ caso: Caso }>> {
