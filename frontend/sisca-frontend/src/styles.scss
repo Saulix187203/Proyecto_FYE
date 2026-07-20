@@ -1,0 +1,244 @@
+@use 'sass:color';
+@use 'bootstrap/scss/bootstrap' as *;
+@use 'bootstrap-icons/font/bootstrap-icons' as *;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+$primary: #0a2463;
+$secondary: #1e3a5f;
+$success: #2e7d32;
+$warning: #f49f0a;
+$danger: #c62828;
+$info: #0d6efd;
+$light: #f8f9fa;
+$dark: #1a1a2e;
+
+$font-family-base: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+$border-radius: 0.5rem;
+$card-border-radius: 0.75rem;
+$card-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: #f0f2f5;
+  font-family: $font-family-base;
+  color: $dark;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: $primary;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: color.adjust($primary, $lightness: -10%);
+}
+
+.card {
+  border: none;
+  border-radius: $card-border-radius;
+  box-shadow: $card-shadow;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &:hover {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+  }
+}
+
+.card-header {
+  background-color: rgba($primary, 0.04);
+  border-bottom: 1px solid rgba($primary, 0.08);
+  font-weight: 600;
+  padding: 1rem 1.25rem;
+}
+
+.badge-estado {
+  padding: 0.5rem 1rem;
+  font-weight: 500;
+  border-radius: 20px;
+  min-width: 100px;
+  display: inline-block;
+  text-align: center;
+  font-size: 0.8rem;
+}
+
+.badge-estado-reportado {
+  background: rgba(#6c757d, 0.1);
+  color: #6c757d;
+  border: 1px solid rgba(#6c757d, 0.2);
+}
+
+.badge-estado-en-revision {
+  background: rgba(#0d6efd, 0.1);
+  color: #0d6efd;
+  border: 1px solid rgba(#0d6efd, 0.2);
+}
+
+.badge-estado-aprobado {
+  background: rgba(#2e7d32, 0.1);
+  color: #2e7d32;
+  border: 1px solid rgba(#2e7d32, 0.2);
+}
+
+.badge-estado-rechazado {
+  background: rgba(#c62828, 0.1);
+  color: #c62828;
+  border: 1px solid rgba(#c62828, 0.2);
+}
+
+.badge-estado-devuelto {
+  background: rgba(#f49f0a, 0.1);
+  color: #f49f0a;
+  border: 1px solid rgba(#f49f0a, 0.2);
+}
+
+.badge-estado-con-acciones {
+  background: rgba(#0a2463, 0.1);
+  color: #0a2463;
+  border: 1px solid rgba(#0a2463, 0.2);
+}
+
+.badge-estado-en-validacion {
+  background: rgba(#f49f0a, 0.1);
+  color: #f49f0a;
+  border: 1px solid rgba(#f49f0a, 0.2);
+}
+
+.badge-estado-cerrado {
+  background: rgba(#1a1a2e, 0.1);
+  color: #1a1a2e;
+  border: 1px solid rgba(#1a1a2e, 0.2);
+}
+
+.table-sisca {
+  thead {
+    background-color: rgba($primary, 0.04);
+
+    th {
+      font-weight: 600;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: $secondary;
+      border-bottom: 2px solid rgba($primary, 0.1);
+    }
+  }
+
+  tbody {
+    tr {
+      transition: all 0.2s ease-in-out;
+
+      &:hover {
+        background-color: rgba($primary, 0.02);
+      }
+    }
+  }
+}
+
+.form-sisca {
+  .form-label {
+    font-weight: 500;
+    font-size: 0.875rem;
+    color: $secondary;
+  }
+
+  .form-control,
+  .form-select {
+    border-radius: $border-radius;
+    border: 1.5px solid rgba($primary, 0.15);
+    transition: all 0.2s ease-in-out;
+
+    &:focus {
+      border-color: $primary;
+      box-shadow: 0 0 0 3px rgba($primary, 0.1);
+    }
+  }
+}
+
+.metric-card {
+  background: white;
+  border-radius: $card-border-radius;
+  padding: 1.25rem;
+  box-shadow: $card-shadow;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  }
+
+  .metric-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &.primary {
+      background: rgba($primary, 0.1);
+      color: $primary;
+    }
+
+    &.success {
+      background: rgba($success, 0.1);
+      color: $success;
+    }
+
+    &.warning {
+      background: rgba($warning, 0.1);
+      color: $warning;
+    }
+
+    &.danger {
+      background: rgba($danger, 0.1);
+      color: $danger;
+    }
+
+    i {
+      font-size: 1.5rem;
+    }
+  }
+
+  .metric-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: $dark;
+  }
+
+  .metric-label {
+    font-size: 0.85rem;
+    color: $secondary;
+    font-weight: 500;
+  }
+}
+
+@media (max-width: 576px) {
+  .metric-card {
+    padding: 1rem;
+
+    .metric-value {
+      font-size: 1.25rem;
+    }
+  }
+
+  .table-sisca {
+    font-size: 0.8rem;
+  }
+}
