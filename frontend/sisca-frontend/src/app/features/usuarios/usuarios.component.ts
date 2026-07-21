@@ -62,10 +62,13 @@ import { Rol, Usuario } from '../../core/models/auth.model';
             <input formControlName="password" type="password" placeholder="Usuario123*" style="width:100%; padding:0.5rem; border:1px solid #ccc; border-radius:4px;">
           </label>
           <label>
-            Roles (nombres separados por coma)
-            <input formControlName="roles" type="text" placeholder="Administrador, Brigada" style="width:100%; padding:0.5rem; border:1px solid #ccc; border-radius:4px;">
+            Rol
+            <select formControlName="roles" style="width:100%; padding:0.5rem; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;">
+              <option [ngValue]="null" disabled>Selecciona un rol</option>
+              <option *ngFor="let rol of roles" [ngValue]="rol.id">{{ rol.nombre }}</option>
+            </select>
           </label>
-          <small style="color:#6c757d;">Roles disponibles: {{ rolesDisponibles }}</small>
+          <small style="color:#6c757d;">Selecciona un rol para el usuario.</small>
           <label style="display:flex; align-items:center; gap:0.5rem;">
             <input formControlName="activo" type="checkbox">
             Activo
@@ -98,7 +101,7 @@ export class UsuariosComponent implements OnInit {
     nombre: ['', Validators.required],
     correo: ['', [Validators.required, Validators.email]],
     password: [''],
-    roles: ['', Validators.required],
+    roles: this.fb.control<number | null>(null, Validators.required),
     activo: [true],
   });
 
@@ -150,7 +153,7 @@ export class UsuariosComponent implements OnInit {
       nombre: usuario.nombre,
       correo: usuario.correo,
       password: '',
-      roles: (usuario.roles ?? []).map((rol) => rol.nombre).join(', '),
+      roles: usuario.roles?.length ? usuario.roles[0].id : null,
       activo: usuario.activo,
     });
   }
@@ -170,7 +173,8 @@ export class UsuariosComponent implements OnInit {
     const correo = this.usuarioForm.value.correo?.toString().trim() || '';
     const password = this.usuarioForm.value.password?.toString() || '';
     const activo = !!this.usuarioForm.value.activo;
-    const roles = this.mapRolesToIds(this.usuarioForm.value.roles?.toString() || '');
+    const rolSeleccionado = this.usuarioForm.value.roles as number | null;
+    const roles = rolSeleccionado ? [rolSeleccionado] : [];
 
     if (!nombre || !correo) {
       this.error = 'Nombre y correo son obligatorios';
@@ -255,14 +259,4 @@ export class UsuariosComponent implements OnInit {
     });
   }
 
-  private mapRolesToIds(rawRoles: string): number[] {
-    if (!rawRoles) return [];
-
-    return rawRoles
-      .split(',')
-      .map((rol) => rol.trim())
-      .filter((rol) => !!rol)
-      .map((rolName) => this.roles.find((rol) => rol.nombre.toLowerCase() === rolName.toLowerCase())?.id)
-      .filter((id): id is number => !!id);
-  }
 }
