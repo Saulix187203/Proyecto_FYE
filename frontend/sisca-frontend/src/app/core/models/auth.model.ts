@@ -4,7 +4,7 @@ export interface Usuario {
   correo: string;
   activo: boolean;
   ultimoAcceso: string;
-  roles: Rol[];
+  roles?: Rol[] | null;
 }
 
 export interface Rol {

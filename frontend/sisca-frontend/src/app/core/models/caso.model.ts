@@ -9,12 +9,12 @@ export interface Caso {
   lugar: string;
   fechaEvento: string;
   fechaCreacion: string;
-  area: Area;
-  proceso: Proceso;
-  tipoEvento: TipoEvento;
-  criticidad: Criticidad;
-  estado: EstadoCaso;
-  creadoPor: Usuario;
+  area: Area | null;
+  proceso: Proceso | null;
+  tipoEvento: TipoEvento | null;
+  criticidad: Criticidad | null;
+  estado: EstadoCaso | null;
+  creadoPor: Usuario | null;
 }
 
 export interface ReporteInicial {

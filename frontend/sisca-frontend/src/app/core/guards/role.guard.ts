@@ -14,6 +14,6 @@ export const roleGuard = (route: ActivatedRouteSnapshot) => {
   const hasRole = requiredRoles.some(role => auth.hasRole(role));
   if (hasRole) return true;
 
-  // Redirigir a una página de "no autorizado" o a dashboard
-  return router.parseUrl('/dashboard');
+  // Redirigir a la lista de casos si el usuario no tiene los roles requeridos
+  return router.parseUrl('/casos');
 };

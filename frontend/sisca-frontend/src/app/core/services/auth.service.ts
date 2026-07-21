@@ -40,7 +40,8 @@ export class AuthService {
   hasRole(roleName: string): boolean {
     const user = this.getUsuario();
     if (!user) return false;
-    return user.roles.some(r => r.nombre === roleName);
+    const roles = user.roles ?? [];
+    return roles.some(r => r.nombre === roleName);
   }
 
   private setSession(data: LoginResponse) {

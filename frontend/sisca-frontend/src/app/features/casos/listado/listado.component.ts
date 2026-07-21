@@ -1,7 +1,7 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CasosService, FiltrosCasos } from '../services/casos.service';
 import { CatalogosService } from '../../../core/services/catalogos.service';
 import { Caso } from '../../../core/models/caso.model';
@@ -39,6 +39,9 @@ import { Caso } from '../../../core/models/caso.model';
       <button type="button" (click)="limpiarFiltros()" style="padding:0.3rem 1rem; background:#6c757d; color:white; border:none; border-radius:4px; cursor:pointer;">Limpiar</button>
     </form>
 
+    <div *ngIf="accessDeniedMessage" style="background:#fff3cd; padding:0.75rem; border-radius:4px; margin-bottom:1rem; color:#856404; border-left:4px solid #ffeeba;">
+      {{ accessDeniedMessage }}
+    </div>
     <!-- Mensaje de depuración -->
     <div *ngIf="debugInfo" style="background:#e8f4fd; padding:0.5rem; border-radius:4px; margin-bottom:1rem; font-size:0.9rem; border-left:3px solid #007bff;">
       <strong>Depuración:</strong> {{ debugInfo }}
@@ -114,8 +117,10 @@ export class ListadoCasosComponent implements OnInit {
   private casosService = inject(CasosService);
   private catalogosService = inject(CatalogosService);
   private fb = inject(FormBuilder);
+  private route = inject(ActivatedRoute);
 
   casos: Caso[] = [];
+  accessDeniedMessage = '';
   areas: any[] = [];
   estados: any[] = [];
   criticidades: any[] = [];
@@ -134,6 +139,13 @@ export class ListadoCasosComponent implements OnInit {
 
   ngOnInit(): void {
     this.cargarCatalogos();
+    this.route.queryParams.subscribe(params => {
+      if (params['accessDenied'] === 'usuarios') {
+        this.accessDeniedMessage = 'No tienes permiso para acceder a Usuarios.';
+      } else {
+        this.accessDeniedMessage = '';
+      }
+    });
     this.aplicarFiltros();
   }
 

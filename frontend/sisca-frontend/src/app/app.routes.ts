@@ -40,6 +40,12 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () => import('./features/notificaciones/notificaciones.component').then(m => m.NotificacionesComponent),
   },
+  {
+    path: 'usuarios',
+    canActivate: [authGuard, roleGuard],
+    data: { roles: ['Administrador'] },
+    loadComponent: () => import('./features/usuarios/usuarios.component').then(m => m.UsuariosComponent),
+  },
   { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
   { path: '**', redirectTo: '/dashboard' },
 ];

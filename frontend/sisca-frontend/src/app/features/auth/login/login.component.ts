@@ -47,7 +47,13 @@ export class LoginComponent {
     if (this.loginForm.invalid) return;
     const { correo, password } = this.loginForm.value;
     this.auth.login({ correo: correo!, password: password! }).subscribe({
-      next: () => this.router.navigate(['/dashboard']),
+      next: () => {
+        const usuario = this.auth.getUsuario();
+        const puedeVerDashboard = usuario?.roles?.some((rol) =>
+          ['Administrador', 'SYMA', 'Gestión y Control SYMA', 'Gerencia'].includes(rol.nombre)
+        );
+        this.router.navigate([puedeVerDashboard ? '/dashboard' : '/casos']);
+      },
       error: (err) => {
         this.error = err.error?.message || 'Error de autenticación. Verifica tus credenciales.';
       },
