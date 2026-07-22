@@ -24,6 +24,7 @@ model Usuario {
   registrosBitacora      BitacoraCaso[]          @relation("BitacoraRegistradaPor")
   notificaciones         Notificacion[]
   comentariosObservacion ComentarioObservacion[] @relation("ComentarioRealizadoPor")
+  brigadasMiembro        BrigadaMiembro[]
 
   @@map("usuarios")
 }
@@ -138,6 +139,113 @@ model EstadoAccion {
   @@map("estados_accion")
 }
 
+model Region {
+  id            Int            @id @default(autoincrement())
+  nombre        String         @unique @db.VarChar(120)
+  codigo        String         @unique @db.VarChar(30)
+  activo        Boolean        @default(true)
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  departamentos Departamento[]
+  brigadas      Brigada[]
+
+  @@map("regiones")
+}
+
+model Departamento {
+  id         Int         @id @default(autoincrement())
+  nombre     String      @db.VarChar(120)
+  codigo     String      @db.VarChar(30)
+  regionId   Int         @map("region_id")
+  activo     Boolean     @default(true)
+  createdAt  DateTime    @default(now()) @map("created_at")
+  updatedAt  DateTime    @updatedAt @map("updated_at")
+  region     Region      @relation(fields: [regionId], references: [id], onDelete: Restrict)
+  municipios Municipio[]
+  brigadas   Brigada[]
+
+  @@unique([regionId, nombre])
+  @@unique([regionId, codigo])
+  @@index([regionId])
+  @@map("departamentos")
+}
+
+model Municipio {
+  id             Int          @id @default(autoincrement())
+  nombre         String       @db.VarChar(120)
+  codigo         String       @db.VarChar(30)
+  departamentoId Int          @map("departamento_id")
+  activo         Boolean      @default(true)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  departamento   Departamento @relation(fields: [departamentoId], references: [id], onDelete: Restrict)
+  brigadas       Brigada[]
+
+  @@unique([departamentoId, nombre])
+  @@unique([departamentoId, codigo])
+  @@index([departamentoId])
+  @@map("municipios")
+}
+
+model TipoBrigada {
+  id          Int       @id @default(autoincrement())
+  nombre      String    @unique @db.VarChar(120)
+  descripcion String?   @db.VarChar(255)
+  activo      Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  brigadas    Brigada[]
+
+  @@map("tipos_brigada")
+}
+
+model Brigada {
+  id                   Int               @id @default(autoincrement())
+  numero               String            @db.VarChar(30)
+  nombre               String            @db.VarChar(150)
+  tipoBrigadaId        Int               @map("tipo_brigada_id")
+  regionId             Int               @map("region_id")
+  departamentoId       Int?              @map("departamento_id")
+  municipioId          Int?              @map("municipio_id")
+  activo               Boolean           @default(true)
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+  tipoBrigada          TipoBrigada       @relation(fields: [tipoBrigadaId], references: [id], onDelete: Restrict)
+  region               Region            @relation(fields: [regionId], references: [id], onDelete: Restrict)
+  departamento         Departamento?     @relation(fields: [departamentoId], references: [id], onDelete: Restrict)
+  municipio            Municipio?        @relation(fields: [municipioId], references: [id], onDelete: Restrict)
+  miembros             BrigadaMiembro[]
+  casosComoReportante  CasiAccidente[]   @relation("CasoBrigadaReportante")
+
+  @@index([tipoBrigadaId])
+  @@index([regionId])
+  @@index([departamentoId])
+  @@index([municipioId])
+  @@index([activo])
+  @@index([tipoBrigadaId, regionId, departamentoId, municipioId, numero])
+  @@map("brigadas")
+}
+
+model BrigadaMiembro {
+  id              Int       @id @default(autoincrement())
+  brigadaId       Int       @map("brigada_id")
+  usuarioId       Int       @map("usuario_id")
+  cargoEnBrigada  String?   @map("cargo_en_brigada") @db.VarChar(120)
+  esLider         Boolean   @default(false) @map("es_lider")
+  activo          Boolean   @default(true)
+  fechaDesde      DateTime  @default(now()) @map("fecha_desde")
+  fechaHasta      DateTime? @map("fecha_hasta")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  brigada         Brigada   @relation(fields: [brigadaId], references: [id], onDelete: Restrict)
+  usuario         Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+
+  @@index([brigadaId])
+  @@index([usuarioId])
+  @@index([brigadaId, usuarioId, activo])
+  @@map("brigadas_miembros")
+}
+
 model CasiAccidente {
   id                      Int                     @id @default(autoincrement())
   correlativo             String                  @unique @db.VarChar(30)
@@ -152,6 +260,7 @@ model CasiAccidente {
   criticidadId            Int                     @map("criticidad_id")
   estadoCasoId            Int                     @map("estado_caso_id")
   reportadoPorId          Int                     @map("reportado_por_id")
+  brigadaReportanteId     Int?                    @map("brigada_reportante_id")
   createdAt               DateTime                @default(now()) @map("created_at")
   updatedAt               DateTime                @updatedAt @map("updated_at")
   area                    Area                    @relation(fields: [areaId], references: [id], onDelete: Restrict)
@@ -160,6 +269,7 @@ model CasiAccidente {
   criticidad              Criticidad              @relation(fields: [criticidadId], references: [id], onDelete: Restrict)
   estadoCaso              EstadoCaso              @relation(fields: [estadoCasoId], references: [id], onDelete: Restrict)
   reportadoPor            Usuario                 @relation("CasoReportadoPor", fields: [reportadoPorId], references: [id], onDelete: Restrict)
+  brigadaReportante       Brigada?                @relation("CasoBrigadaReportante", fields: [brigadaReportanteId], references: [id], onDelete: Restrict)
   reporteInicial          ReporteInicial?
   validacionesProcedencia ValidacionProcedencia[]
   divulgaciones           DivulgacionCaso[]
@@ -175,7 +285,10 @@ model CasiAccidente {
   @@index([criticidadId])
   @@index([estadoCasoId])
   @@index([reportadoPorId])
+  @@index([brigadaReportanteId])
   @@index([fechaReporte])
+  @@index([brigadaReportanteId, fechaReporte, id], map: "idx_casi_accidente_brigada_fecha")
+  @@index([fechaHoraEvento, id], map: "idx_casi_accidente_fecha_evento")
   @@map("casi_accidentes")
 }
 

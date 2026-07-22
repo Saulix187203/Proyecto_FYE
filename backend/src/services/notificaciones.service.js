@@ -1,8 +1,18 @@
 const prisma = require('../config/prisma');
 const AppError = require('../utils/app-error');
+const {
+  parsePagination,
+  parseSorting,
+  buildPagination,
+} = require('../utils/pagination');
 
 const notificationInclude = {
   casiAccidente: { select: { id: true, correlativo: true, titulo: true } },
+};
+const NOTIFICATION_SORT_FIELDS = {
+  id: 'id',
+  createdAt: 'createdAt',
+  fechaLectura: 'fechaLectura',
 };
 
 function createNotification({
@@ -71,16 +81,56 @@ function parseReadFilter(value) {
   throw new AppError('El filtro leida debe ser true o false', 400);
 }
 
-function listNotifications(usuarioId, query = {}) {
+function parseDate(value, field) {
+  if (typeof value !== 'string' && !(value instanceof Date)) {
+    throw new AppError(`${field} debe ser una fecha válida`, 400);
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new AppError(`${field} debe ser una fecha válida`, 400);
+  }
+
+  return date;
+}
+
+async function listNotifications(usuarioId, query = {}) {
   const leida = parseReadFilter(query.leida);
-  return prisma.notificacion.findMany({
-    where: {
-      usuarioId,
-      ...(leida === undefined ? {} : { leida }),
-    },
-    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-    include: notificationInclude,
+  const pagination = parsePagination(query);
+  const sorting = parseSorting(query, NOTIFICATION_SORT_FIELDS, {
+    sortBy: 'createdAt',
+    sortDir: 'desc',
   });
+  const where = {
+    usuarioId,
+    ...(leida === undefined ? {} : { leida }),
+  };
+
+  if (query.fechaDesde || query.fechaHasta) {
+    where.createdAt = {};
+    if (query.fechaDesde) where.createdAt.gte = parseDate(query.fechaDesde, 'fechaDesde');
+    if (query.fechaHasta) where.createdAt.lte = parseDate(query.fechaHasta, 'fechaHasta');
+    if (where.createdAt.gte && where.createdAt.lte && where.createdAt.gte > where.createdAt.lte) {
+      throw new AppError('fechaDesde no puede ser mayor que fechaHasta', 400);
+    }
+  }
+
+  const [notificaciones, totalItems] = await Promise.all([
+    prisma.notificacion.findMany({
+      where,
+      skip: pagination.skip,
+      take: pagination.limit,
+      orderBy: sorting.orderBy,
+      include: notificationInclude,
+    }),
+    prisma.notificacion.count({ where }),
+  ]);
+
+  return {
+    notificaciones,
+    pagination: buildPagination({ ...pagination, totalItems }),
+    sort: { sortBy: sorting.sortBy, sortDir: sorting.sortDir },
+  };
 }
 
 async function markAsRead(id, usuarioId) {

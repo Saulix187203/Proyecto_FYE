@@ -1,7 +1,14 @@
 const bcrypt = require('bcrypt');
 const { PrismaClient } = require('@prisma/client');
+const geografiaGuatemala = require('./data/geografia-guatemala');
 
 const prisma = new PrismaClient();
+
+const EXTRACTOR_ROLE_NAME = 'Extractor API';
+const EXTRACTOR_ROLE_DESCRIPTION =
+  'Rol técnico de solo lectura para extracción de información mediante API.';
+const EXTRACTOR_EMAIL = 'tecnico.api@sisca.com';
+const DEVELOPMENT_EXTRACTOR_PASSWORD = 'TecnicoApi123*';
 
 const roles = [
   'Administrador',
@@ -65,6 +72,34 @@ const procesos = [
   { area: 'Seguridad Industrial', nombre: 'Gestión de seguridad industrial' },
 ];
 
+const regiones = geografiaGuatemala.map(({ nombre, codigo }) => ({ nombre, codigo }));
+
+const departamentos = geografiaGuatemala.flatMap((region) =>
+  region.departamentos.map(({ nombre, codigo }) => ({
+    nombre,
+    codigo,
+    region: region.nombre,
+  })),
+);
+
+const municipios = geografiaGuatemala.flatMap((region) =>
+  region.departamentos.flatMap((departamento) =>
+    departamento.municipios.map(({ nombre, codigo }) => ({
+      nombre,
+      codigo,
+      departamento: departamento.nombre,
+    })),
+  ),
+);
+
+const tiposBrigada = [
+  'Brigada de Emergencia',
+  'Brigada de Primeros Auxilios',
+  'Brigada contra Incendios',
+  'Brigada de Evacuación',
+  'Brigada de Seguridad Industrial',
+];
+
 async function upsertNamedCatalog(model, names) {
   await Promise.all(
     names.map((nombre) =>
@@ -79,8 +114,30 @@ async function upsertNamedCatalog(model, names) {
 
 async function main() {
   await upsertNamedCatalog(prisma.rol, roles);
+  const rolExtractor = await prisma.rol.upsert({
+    where: { nombre: EXTRACTOR_ROLE_NAME },
+    update: {
+      descripcion: EXTRACTOR_ROLE_DESCRIPTION,
+      activo: true,
+    },
+    create: {
+      nombre: EXTRACTOR_ROLE_NAME,
+      descripcion: EXTRACTOR_ROLE_DESCRIPTION,
+    },
+  });
   await upsertNamedCatalog(prisma.tipoEvento, tiposEvento);
   await upsertNamedCatalog(prisma.area, areas);
+  await upsertNamedCatalog(prisma.tipoBrigada, tiposBrigada);
+
+  await Promise.all(
+    regiones.map(({ nombre, codigo }) =>
+      prisma.region.upsert({
+        where: { nombre },
+        update: { codigo, activo: true },
+        create: { nombre, codigo, activo: true },
+      }),
+    ),
+  );
 
   const areasCreadas = await prisma.area.findMany({
     where: { nombre: { in: areas } },
@@ -100,6 +157,52 @@ async function main() {
         where: { areaId_nombre: { areaId, nombre } },
         update: { activo: true },
         create: { areaId, nombre },
+      });
+    }),
+  );
+
+  const regionesCreadas = await prisma.region.findMany({
+    where: { nombre: { in: regiones.map((region) => region.nombre) } },
+    select: { id: true, nombre: true },
+  });
+  const regionIdPorNombre = new Map(regionesCreadas.map((region) => [region.nombre, region.id]));
+
+  await Promise.all(
+    departamentos.map(({ nombre, codigo, region }) => {
+      const regionId = regionIdPorNombre.get(region);
+
+      if (!regionId) {
+        throw new Error(`No se encontró la región requerida para el departamento: ${region}`);
+      }
+
+      return prisma.departamento.upsert({
+        where: { regionId_nombre: { regionId, nombre } },
+        update: { codigo, activo: true },
+        create: { nombre, codigo, regionId, activo: true },
+      });
+    }),
+  );
+
+  const departamentosCreados = await prisma.departamento.findMany({
+    where: { nombre: { in: departamentos.map((departamento) => departamento.nombre) } },
+    select: { id: true, nombre: true },
+  });
+  const departamentoIdPorNombre = new Map(
+    departamentosCreados.map((departamento) => [departamento.nombre, departamento.id]),
+  );
+
+  await Promise.all(
+    municipios.map(({ nombre, codigo, departamento }) => {
+      const departamentoId = departamentoIdPorNombre.get(departamento);
+
+      if (!departamentoId) {
+        throw new Error(`No se encontró el departamento requerido para el municipio: ${departamento}`);
+      }
+
+      return prisma.municipio.upsert({
+        where: { departamentoId_nombre: { departamentoId, nombre } },
+        update: { codigo, activo: true },
+        create: { nombre, codigo, departamentoId, activo: true },
       });
     }),
   );
@@ -165,6 +268,52 @@ async function main() {
       rolId: rolAdministrador.id,
     },
   });
+
+  const extractorPassword =
+    process.env.API_EXTRACTOR_PASSWORD || DEVELOPMENT_EXTRACTOR_PASSWORD;
+  const extractorPasswordHash = await bcrypt.hash(extractorPassword, 12);
+  const tecnicoApi = await prisma.usuario.upsert({
+    where: { correo: EXTRACTOR_EMAIL },
+    update: {
+      nombre: 'Técnico API',
+      passwordHash: extractorPasswordHash,
+      activo: true,
+    },
+    create: {
+      nombre: 'Técnico API',
+      correo: EXTRACTOR_EMAIL,
+      passwordHash: extractorPasswordHash,
+      activo: true,
+    },
+  });
+
+  await prisma.$transaction([
+    prisma.usuarioRol.deleteMany({
+      where: {
+        usuarioId: tecnicoApi.id,
+        rolId: { not: rolExtractor.id },
+      },
+    }),
+    prisma.usuarioRol.upsert({
+      where: {
+        usuarioId_rolId: {
+          usuarioId: tecnicoApi.id,
+          rolId: rolExtractor.id,
+        },
+      },
+      update: {},
+      create: {
+        usuarioId: tecnicoApi.id,
+        rolId: rolExtractor.id,
+      },
+    }),
+  ]);
+
+  if (!process.env.API_EXTRACTOR_PASSWORD && process.env.NODE_ENV !== 'production') {
+    console.warn(
+      'API_EXTRACTOR_PASSWORD no está configurada; se usó la contraseña temporal exclusiva para desarrollo. Cámbiela antes de habilitar el acceso técnico.',
+    );
+  }
 
   console.log('SISCA seed completed successfully.');
 }

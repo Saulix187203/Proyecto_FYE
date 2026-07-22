@@ -1,6 +1,7 @@
 const { Router } = require('express');
 const accionesCorrectivasRoutes = require('./acciones-correctivas.routes');
 const authRoutes = require('./auth.routes');
+const brigadasRoutes = require('./brigadas.routes');
 const casosRoutes = require('./casos.routes');
 const catalogosRoutes = require('./catalogos.routes');
 const cierreCasosRoutes = require('./cierre-casos.routes');
@@ -18,6 +19,7 @@ const router = Router();
 
 router.use('/acciones-correctivas', accionesCorrectivasRoutes);
 router.use('/auth', authRoutes);
+router.use('/brigadas', brigadasRoutes);
 router.use('/casos', casosRoutes);
 router.use('/catalogos', catalogosRoutes);
 router.use('/cierre-casos', cierreCasosRoutes);

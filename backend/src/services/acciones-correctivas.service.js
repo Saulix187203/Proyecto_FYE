@@ -6,6 +6,11 @@ const {
   createNotification,
   notifyUsersByRoles,
 } = require('./notificaciones.service');
+const {
+  parsePagination,
+  parseSorting,
+  buildPagination,
+} = require('../utils/pagination');
 
 const safeUserSelect = { id: true, nombre: true, correo: true };
 const evidenceSelect = {
@@ -29,6 +34,24 @@ const actionInclude = {
   responsable: { select: safeUserSelect },
   estadoAccion: { select: { id: true, nombre: true } },
   evidencias: { orderBy: { createdAt: 'asc' }, select: evidenceSelect },
+};
+const actionListInclude = {
+  casiAccidente: {
+    select: {
+      id: true,
+      correlativo: true,
+      estadoCaso: { select: { id: true, nombre: true } },
+    },
+  },
+  responsable: { select: safeUserSelect },
+  estadoAccion: { select: { id: true, nombre: true } },
+};
+const ACTION_SORT_FIELDS = {
+  id: 'id',
+  fechaCompromiso: 'fechaCompromiso',
+  fechaCierre: 'fechaCierre',
+  porcentajeAvance: 'porcentajeAvance',
+  createdAt: 'createdAt',
 };
 
 function parsePositiveId(value, field) {
@@ -66,6 +89,18 @@ function optionalText(value, field, required = false) {
     throw new AppError(`${field} debe ser un texto válido`, 400);
   }
   return value.trim();
+}
+
+function parseOptionalBoolean(value, field) {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (value === true || value === 'true') return true;
+  if (value === false || value === 'false') return false;
+  throw new AppError(`${field} debe ser true o false`, 400);
+}
+
+function catalogFilter(value) {
+  if (/^\d+$/.test(String(value))) return { id: Number(value) };
+  return { nombre: { equals: String(value).trim(), mode: 'insensitive' } };
 }
 
 function serializeAction(action) {
@@ -202,6 +237,88 @@ async function listByCase(idCaso) {
     include: actionInclude,
   });
   return actions.map(serializeAction);
+}
+
+async function listActions(query = {}) {
+  const pagination = parsePagination(query);
+  const sorting = parseSorting(query, ACTION_SORT_FIELDS, {
+    sortBy: 'createdAt',
+    sortDir: 'desc',
+  });
+  const where = {};
+
+  if (query.estado) where.estadoAccion = catalogFilter(query.estado);
+
+  if (query.responsable) {
+    if (/^\d+$/.test(String(query.responsable))) {
+      where.responsableId = parsePositiveId(query.responsable, 'responsable');
+    } else {
+      const responsable = requiredText(query.responsable, 'responsable');
+      where.responsable = {
+        OR: [
+          { nombre: { contains: responsable, mode: 'insensitive' } },
+          { correo: { contains: responsable, mode: 'insensitive' } },
+        ],
+      };
+    }
+  }
+
+  if (query.caso) {
+    if (/^\d+$/.test(String(query.caso))) {
+      where.casiAccidenteId = parsePositiveId(query.caso, 'caso');
+    } else {
+      where.casiAccidente = {
+        correlativo: { equals: requiredText(query.caso, 'caso'), mode: 'insensitive' },
+      };
+    }
+  }
+
+  if (query.fechaDesde || query.fechaHasta) {
+    where.fechaCompromiso = {};
+    if (query.fechaDesde) {
+      where.fechaCompromiso.gte = parseDate(query.fechaDesde, 'fechaDesde');
+    }
+    if (query.fechaHasta) {
+      where.fechaCompromiso.lte = parseDate(query.fechaHasta, 'fechaHasta');
+    }
+    if (
+      where.fechaCompromiso.gte &&
+      where.fechaCompromiso.lte &&
+      where.fechaCompromiso.gte > where.fechaCompromiso.lte
+    ) {
+      throw new AppError('fechaDesde no puede ser mayor que fechaHasta', 400);
+    }
+  }
+
+  const vencidas = parseOptionalBoolean(query.vencidas, 'vencidas');
+  if (vencidas === true) {
+    where.AND = [
+      { fechaCompromiso: { lt: new Date() } },
+      { estadoAccion: { nombre: { not: 'Cerrada' } } },
+    ];
+  } else if (vencidas === false) {
+    where.OR = [
+      { fechaCompromiso: { gte: new Date() } },
+      { estadoAccion: { nombre: 'Cerrada' } },
+    ];
+  }
+
+  const [acciones, totalItems] = await Promise.all([
+    prisma.accionCorrectiva.findMany({
+      where,
+      skip: pagination.skip,
+      take: pagination.limit,
+      orderBy: sorting.orderBy,
+      include: actionListInclude,
+    }),
+    prisma.accionCorrectiva.count({ where }),
+  ]);
+
+  return {
+    acciones: acciones.map(serializeAction),
+    pagination: buildPagination({ ...pagination, totalItems }),
+    sort: { sortBy: sorting.sortBy, sortDir: sorting.sortDir },
+  };
 }
 
 async function getById(id) {
@@ -472,6 +589,7 @@ function returnAction(id, usuarioId, input = {}) {
 
 module.exports = {
   createAction,
+  listActions,
   listByCase,
   getById,
   updateAction,

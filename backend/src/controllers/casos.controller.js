@@ -1,7 +1,7 @@
 const casosService = require('../services/casos.service');
 
 async function create(req, res) {
-  const caso = await casosService.createCase(req.body, req.user.id);
+  const caso = await casosService.createCase(req.body, req.user);
   res.status(201).json({
     success: true,
     message: 'Caso creado correctamente',
@@ -10,11 +10,11 @@ async function create(req, res) {
 }
 
 async function list(req, res) {
-  const casos = await casosService.listCases(req.query);
+  const data = await casosService.listCases(req.query);
   res.status(200).json({
     success: true,
     message: 'Casos obtenidos correctamente',
-    data: { casos },
+    data,
   });
 }
 
@@ -28,7 +28,7 @@ async function getById(req, res) {
 }
 
 async function update(req, res) {
-  const caso = await casosService.updateCase(req.params.id, req.body, req.user.id);
+  const caso = await casosService.updateCase(req.params.id, req.body, req.user);
   res.status(200).json({
     success: true,
     message: 'Caso actualizado correctamente',

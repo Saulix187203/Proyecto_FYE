@@ -87,22 +87,59 @@ function validateRoles(roles, required = true) {
   if (
     !Array.isArray(roles) ||
     (required && roles.length === 0) ||
-    roles.some((id) => !Number.isInteger(id) || id <= 0)
+    roles.some((rol) => {
+      if (Number.isInteger(rol)) {
+        return rol <= 0;
+      }
+
+      return typeof rol !== 'string' || !rol.trim() || rol.trim().length > 100;
+    })
   ) {
-    throw new AppError('Los roles deben ser una lista de ids enteros positivos', 400);
+    throw new AppError('Los roles deben ser una lista de nombres de rol válidos', 400);
   }
 
-  return [...new Set(roles)];
+  return [
+    ...new Set(
+      roles.map((rol) => {
+        if (Number.isInteger(rol)) {
+          return rol;
+        }
+
+        return rol.trim();
+      }),
+    ),
+  ];
 }
 
-async function ensureRolesExist(client, roleIds) {
-  const count = await client.rol.count({
-    where: { id: { in: roleIds }, activo: true },
+async function getExistingRoles(client, roles) {
+  const roleIds = roles.filter((rol) => Number.isInteger(rol));
+  const roleNames = roles.filter((rol) => typeof rol === 'string');
+  const or = [];
+
+  if (roleIds.length) {
+    or.push({ id: { in: roleIds } });
+  }
+
+  if (roleNames.length) {
+    or.push({ nombre: { in: roleNames } });
+  }
+
+  const existingRoles = await client.rol.findMany({
+    where: { activo: true, OR: or },
+    select: { id: true, nombre: true },
   });
 
-  if (count !== roleIds.length) {
+  const existingIds = new Set(existingRoles.map((rol) => rol.id));
+  const existingNames = new Set(existingRoles.map((rol) => rol.nombre));
+  const allRolesExist = roles.every((rol) =>
+    Number.isInteger(rol) ? existingIds.has(rol) : existingNames.has(rol),
+  );
+
+  if (!allRolesExist) {
     throw new AppError('Uno o más roles no existen o están inactivos', 400);
   }
+
+  return existingRoles;
 }
 
 async function listUsuarios() {
@@ -132,7 +169,7 @@ async function createUsuario(input = {}) {
   const nombre = validateNombre(input.nombre);
   const correo = validateCorreo(input.correo);
   const password = validatePassword(input.password);
-  const roleIds = validateRoles(input.roles);
+  const roles = validateRoles(input.roles);
   const passwordHash = await hashPassword(password);
 
   const usuario = await prisma.$transaction(async (tx) => {
@@ -142,7 +179,7 @@ async function createUsuario(input = {}) {
       throw new AppError('Ya existe un usuario con ese correo', 400);
     }
 
-    await ensureRolesExist(tx, roleIds);
+    const existingRoles = await getExistingRoles(tx, roles);
 
     return tx.usuario.create({
       data: {
@@ -150,8 +187,8 @@ async function createUsuario(input = {}) {
         correo,
         passwordHash,
         roles: {
-          create: roleIds.map((rolId) => ({
-            rol: { connect: { id: rolId } },
+          create: existingRoles.map((rol) => ({
+            rol: { connect: { id: rol.id } },
           })),
         },
       },
@@ -166,24 +203,18 @@ async function updateUsuario(id, input = {}) {
   const usuarioId = parseUsuarioId(id);
   const nombre = validateNombre(input.nombre, false);
   const correo = validateCorreo(input.correo, false);
-  const password = validatePassword(input.password, false);
-  const roleIds = validateRoles(input.roles, false);
 
   if (input.activo !== undefined && typeof input.activo !== 'boolean') {
     throw new AppError('El estado activo debe ser verdadero o falso', 400);
   }
 
-  if (
-    nombre === undefined &&
-    correo === undefined &&
-    password === undefined &&
-    roleIds === undefined &&
-    input.activo === undefined
-  ) {
-    throw new AppError('Debe enviar al menos un campo para actualizar', 400);
+  if (input.password !== undefined || input.roles !== undefined) {
+    throw new AppError('Use los endpoints específicos para cambiar contraseña o roles', 400);
   }
 
-  const passwordHash = password === undefined ? undefined : await hashPassword(password);
+  if (nombre === undefined && correo === undefined && input.activo === undefined) {
+    throw new AppError('Debe enviar al menos un campo para actualizar', 400);
+  }
 
   const usuario = await prisma.$transaction(async (tx) => {
     const current = await tx.usuario.findUnique({ where: { id: usuarioId } });
@@ -200,29 +231,66 @@ async function updateUsuario(id, input = {}) {
       }
     }
 
-    if (roleIds !== undefined) {
-      await ensureRolesExist(tx, roleIds);
-    }
-
     const data = {};
     if (nombre !== undefined) data.nombre = nombre;
     if (correo !== undefined) data.correo = correo;
-    if (passwordHash !== undefined) data.passwordHash = passwordHash;
     if (input.activo !== undefined) data.activo = input.activo;
-    if (roleIds !== undefined) {
-      data.roles = {
-        deleteMany: {},
-        create: roleIds.map((rolId) => ({
-          rol: { connect: { id: rolId } },
-        })),
-      };
-    }
 
     return tx.usuario.update({
       where: { id: usuarioId },
       data,
       select: usuarioSelect,
     });
+  });
+
+  return serializeUsuario(usuario);
+}
+
+async function updateUsuarioRoles(id, input = {}) {
+  const usuarioId = parseUsuarioId(id);
+  const roles = validateRoles(input.roles);
+
+  const usuario = await prisma.$transaction(async (tx) => {
+    const current = await tx.usuario.findUnique({ where: { id: usuarioId } });
+
+    if (!current) {
+      throw new AppError('Usuario no encontrado', 404);
+    }
+
+    const existingRoles = await getExistingRoles(tx, roles);
+
+    await tx.usuarioRol.deleteMany({ where: { usuarioId } });
+    await tx.usuarioRol.createMany({
+      data: existingRoles.map((rol) => ({
+        usuarioId,
+        rolId: rol.id,
+      })),
+    });
+
+    return tx.usuario.findUnique({
+      where: { id: usuarioId },
+      select: usuarioSelect,
+    });
+  });
+
+  return serializeUsuario(usuario);
+}
+
+async function updateUsuarioPassword(id, input = {}) {
+  const usuarioId = parseUsuarioId(id);
+  const password = validatePassword(input.password);
+  const passwordHash = await hashPassword(password);
+
+  const existing = await prisma.usuario.findUnique({ where: { id: usuarioId } });
+
+  if (!existing) {
+    throw new AppError('Usuario no encontrado', 404);
+  }
+
+  const usuario = await prisma.usuario.update({
+    where: { id: usuarioId },
+    data: { passwordHash },
+    select: usuarioSelect,
   });
 
   return serializeUsuario(usuario);
@@ -250,5 +318,7 @@ module.exports = {
   getUsuarioById,
   createUsuario,
   updateUsuario,
+  updateUsuarioRoles,
+  updateUsuarioPassword,
   deactivateUsuario,
 };

@@ -32,4 +32,31 @@ async function estadosAccion(_req, res) {
   respond(res, await catalogosService.listEstadosAccion());
 }
 
-module.exports = { areas, procesos, tiposEvento, criticidades, estadosCaso, estadosAccion };
+async function regiones(_req, res) {
+  respond(res, await catalogosService.listRegiones());
+}
+
+async function departamentos(req, res) {
+  respond(res, await catalogosService.listDepartamentos(req.query));
+}
+
+async function municipios(req, res) {
+  respond(res, await catalogosService.listMunicipios(req.query));
+}
+
+async function tiposBrigada(_req, res) {
+  respond(res, await catalogosService.listTiposBrigada());
+}
+
+module.exports = {
+  areas,
+  procesos,
+  tiposEvento,
+  criticidades,
+  estadosCaso,
+  estadosAccion,
+  regiones,
+  departamentos,
+  municipios,
+  tiposBrigada,
+};

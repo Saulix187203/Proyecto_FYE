@@ -1,10 +1,12 @@
 const { Router } = require('express');
 const evidenceController = require('../controllers/evidencias.controller');
 const authMiddleware = require('../middlewares/auth.middleware');
+const denyRoleMiddleware = require('../middlewares/deny-role.middleware');
 const roleMiddleware = require('../middlewares/role.middleware');
 const { uploadEvidence } = require('../middlewares/upload.middleware');
 
 const router = Router();
+const denyExtractor = denyRoleMiddleware(['Extractor API']);
 const canUploadToCase = roleMiddleware([
   'Administrador',
   'Brigada',
@@ -19,7 +21,7 @@ const canUploadToAction = roleMiddleware([
   'SYMA',
 ]);
 
-router.use(authMiddleware);
+router.use(authMiddleware, denyExtractor);
 router.get('/caso/:idCaso', evidenceController.listByCase);
 router.post('/caso/:idCaso', canUploadToCase, uploadEvidence, evidenceController.createForCase);
 router.get('/accion/:idAccion', evidenceController.listByAction);
