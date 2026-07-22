@@ -3,6 +3,11 @@ const prisma = require('../config/prisma');
 const AppError = require('../utils/app-error');
 const { generarCorrelativo } = require('../utils/correlativo');
 const { registrarBitacora } = require('./bitacora.service');
+const {
+  parsePagination,
+  parseSorting,
+  buildPagination,
+} = require('../utils/pagination');
 
 const caseRelations = {
   area: { select: { id: true, nombre: true } },
@@ -11,6 +16,52 @@ const caseRelations = {
   criticidad: { select: { id: true, nombre: true, color: true } },
   estadoCaso: { select: { id: true, nombre: true } },
   reportadoPor: { select: { id: true, nombre: true, correo: true } },
+  brigadaReportante: {
+    select: {
+      id: true,
+      numero: true,
+      nombre: true,
+      tipoBrigada: { select: { id: true, nombre: true, descripcion: true } },
+      region: { select: { id: true, nombre: true, codigo: true } },
+      departamento: { select: { id: true, nombre: true, codigo: true } },
+      municipio: { select: { id: true, nombre: true, codigo: true } },
+    },
+  },
+};
+
+const PRIVILEGED_BRIGADA_ROLES = new Set(['Administrador', 'PRL Contratista', 'SYMA']);
+const CASE_SORT_FIELDS = {
+  id: 'id',
+  correlativo: 'correlativo',
+  fechaEvento: 'fechaHoraEvento',
+  fechaReporte: 'fechaReporte',
+  createdAt: 'createdAt',
+};
+
+const caseListSelect = {
+  id: true,
+  correlativo: true,
+  fechaHoraEvento: true,
+  fechaReporte: true,
+  ubicacion: true,
+  createdAt: true,
+  area: { select: { id: true, nombre: true } },
+  proceso: { select: { id: true, nombre: true } },
+  tipoEvento: { select: { id: true, nombre: true } },
+  criticidad: { select: { id: true, nombre: true, color: true } },
+  estadoCaso: { select: { id: true, nombre: true } },
+  reportadoPor: { select: { id: true, nombre: true, correo: true } },
+  brigadaReportante: {
+    select: {
+      id: true,
+      numero: true,
+      nombre: true,
+      tipoBrigada: { select: { id: true, nombre: true } },
+      region: { select: { id: true, nombre: true, codigo: true } },
+      departamento: { select: { id: true, nombre: true, codigo: true } },
+      municipio: { select: { id: true, nombre: true, codigo: true } },
+    },
+  },
 };
 
 function parsePositiveId(value, field) {
@@ -21,6 +72,17 @@ function parsePositiveId(value, field) {
   }
 
   return parsed;
+}
+
+function parseOptionalPositiveId(value, field) {
+  if (value === undefined || value === null || value === '') return undefined;
+  return parsePositiveId(value, field);
+}
+
+function parseNullablePositiveId(value, field) {
+  if (value === null) return null;
+  if (value === undefined) return undefined;
+  return parsePositiveId(value, field);
 }
 
 function parseDate(value, field) {
@@ -65,9 +127,103 @@ function serializeCase(caso) {
     criticidad: caso.criticidad,
     estado: caso.estadoCaso,
     usuarioReporta: caso.reportadoPor,
+    brigadaReportante: caso.brigadaReportante,
     createdAt: caso.createdAt,
     updatedAt: caso.updatedAt,
   };
+}
+
+function getRoleNames(user = {}) {
+  return Array.isArray(user.roles) ? user.roles.map((rol) => rol.nombre) : [];
+}
+
+function canSelectAnyBrigada(user) {
+  return getRoleNames(user).some((rol) => PRIVILEGED_BRIGADA_ROLES.has(rol));
+}
+
+function resolveInputBrigadaId(input = {}) {
+  if (input.idBrigadaReportante !== undefined) {
+    return parseNullablePositiveId(input.idBrigadaReportante, 'idBrigadaReportante');
+  }
+
+  if (input.brigadaReportanteId !== undefined) {
+    return parseNullablePositiveId(input.brigadaReportanteId, 'brigadaReportanteId');
+  }
+
+  return undefined;
+}
+
+async function validateActiveBrigada(brigadaId) {
+  const brigada = await prisma.brigada.findFirst({
+    where: { id: brigadaId, activo: true },
+    select: { id: true },
+  });
+
+  if (!brigada) throw new AppError('Brigada reportante no encontrada o inactiva', 404);
+}
+
+async function validateUserMembership(usuarioId, brigadaId) {
+  const membership = await prisma.brigadaMiembro.findFirst({
+    where: {
+      usuarioId,
+      brigadaId,
+      activo: true,
+      brigada: { activo: true },
+    },
+    select: { id: true },
+  });
+
+  if (!membership) {
+    throw new AppError('El usuario no pertenece activamente a la brigada reportante indicada', 403);
+  }
+}
+
+async function resolveBrigadaForCreate(input, user) {
+  const requestedBrigadaId = resolveInputBrigadaId(input);
+
+  if (requestedBrigadaId !== undefined) {
+    if (requestedBrigadaId === null) return null;
+
+    await validateActiveBrigada(requestedBrigadaId);
+    if (!canSelectAnyBrigada(user)) {
+      await validateUserMembership(user.id, requestedBrigadaId);
+    }
+
+    return requestedBrigadaId;
+  }
+
+  const memberships = await prisma.brigadaMiembro.findMany({
+    where: {
+      usuarioId: user.id,
+      activo: true,
+      brigada: { activo: true },
+    },
+    take: 2,
+    select: { brigadaId: true },
+  });
+
+  return memberships.length === 1 ? memberships[0].brigadaId : null;
+}
+
+async function resolveBrigadaForUpdate(input, user) {
+  const requestedBrigadaId = resolveInputBrigadaId(input);
+
+  if (requestedBrigadaId === undefined) return undefined;
+
+  if (requestedBrigadaId === null) {
+    if (!canSelectAnyBrigada(user)) {
+      throw new AppError('No tiene permisos para limpiar la brigada reportante', 403);
+    }
+
+    return null;
+  }
+
+  await validateActiveBrigada(requestedBrigadaId);
+  if (!canSelectAnyBrigada(user)) {
+    await validateUserMembership(user.id, requestedBrigadaId);
+  }
+
+  return requestedBrigadaId;
 }
 
 async function validateCatalogs({ idArea, idProceso, idTipoEvento, idCriticidad }) {
@@ -96,7 +252,8 @@ async function validateCatalogs({ idArea, idProceso, idTipoEvento, idCriticidad 
   }
 }
 
-async function createCase(input = {}, usuarioId) {
+async function createCase(input = {}, user) {
+  const usuarioId = user.id;
   const idArea = parsePositiveId(input.idArea, 'idArea');
   const idProceso = parsePositiveId(input.idProceso, 'idProceso');
   const idTipoEvento = parsePositiveId(input.idTipoEvento, 'idTipoEvento');
@@ -109,6 +266,7 @@ async function createCase(input = {}, usuarioId) {
     descripcion.slice(0, 200);
 
   await validateCatalogs({ idArea, idProceso, idTipoEvento, idCriticidad });
+  const brigadaReportanteId = await resolveBrigadaForCreate(input, user);
 
   const estadoInicial = await prisma.estadoCaso.findFirst({
     where: { nombre: 'Reportado', activo: true },
@@ -137,16 +295,21 @@ async function createCase(input = {}, usuarioId) {
               criticidadId: idCriticidad,
               estadoCasoId: estadoInicial.id,
               reportadoPorId: usuarioId,
+              brigadaReportanteId,
             },
             include: caseRelations,
           });
+
+          const brigadaObservacion = created.brigadaReportante
+            ? `. Brigada reportante: ${created.brigadaReportante.numero} - ${created.brigadaReportante.nombre}`
+            : '';
 
           await registrarBitacora({
             idCaso: created.id,
             idUsuario: usuarioId,
             accion: 'CREACION_CASO',
             estadoNuevo: estadoInicial.id,
-            observacion: `Caso ${correlativo} creado en estado Reportado`,
+            observacion: `Caso ${correlativo} creado en estado Reportado${brigadaObservacion}`,
             client: tx,
           });
 
@@ -170,17 +333,49 @@ function catalogFilter(value) {
   return { nombre: { equals: String(value).trim(), mode: 'insensitive' } };
 }
 
+function numericFilter(value, field) {
+  return parseOptionalPositiveId(value, field);
+}
+
 async function listCases(query = {}) {
   const where = {};
+  const pagination = parsePagination(query);
+  const sorting = parseSorting(query, CASE_SORT_FIELDS, {
+    sortBy: 'fechaReporte',
+    sortDir: 'desc',
+  });
 
   if (query.estado) where.estadoCaso = catalogFilter(query.estado);
   if (query.area) where.area = catalogFilter(query.area);
   if (query.criticidad) where.criticidad = catalogFilter(query.criticidad);
 
+  const brigadaId = numericFilter(query.brigada ?? query.brigadaReportante, 'brigada');
+  const regionId = numericFilter(query.region, 'region');
+  const departamentoId = numericFilter(query.departamento, 'departamento');
+  const municipioId = numericFilter(query.municipio, 'municipio');
+  const tipoBrigadaId = numericFilter(query.tipoBrigada, 'tipoBrigada');
+
+  if (brigadaId) where.brigadaReportanteId = brigadaId;
+  if (regionId || departamentoId || municipioId || tipoBrigadaId) {
+    where.brigadaReportante = {
+      ...(regionId ? { regionId } : {}),
+      ...(departamentoId ? { departamentoId } : {}),
+      ...(municipioId ? { municipioId } : {}),
+      ...(tipoBrigadaId ? { tipoBrigadaId } : {}),
+    };
+  }
+
   if (query.fechaDesde || query.fechaHasta) {
     where.fechaHoraEvento = {};
     if (query.fechaDesde) where.fechaHoraEvento.gte = parseDate(query.fechaDesde, 'fechaDesde');
     if (query.fechaHasta) where.fechaHoraEvento.lte = parseDate(query.fechaHasta, 'fechaHasta');
+    if (
+      where.fechaHoraEvento.gte &&
+      where.fechaHoraEvento.lte &&
+      where.fechaHoraEvento.gte > where.fechaHoraEvento.lte
+    ) {
+      throw new AppError('fechaDesde no puede ser mayor que fechaHasta', 400);
+    }
   }
 
   if (query.texto) {
@@ -193,26 +388,36 @@ async function listCases(query = {}) {
     ];
   }
 
-  const casos = await prisma.casiAccidente.findMany({
-    where,
-    orderBy: [{ fechaReporte: 'desc' }, { id: 'desc' }],
-    include: caseRelations,
-  });
+  const [casos, totalItems] = await Promise.all([
+    prisma.casiAccidente.findMany({
+      where,
+      skip: pagination.skip,
+      take: pagination.limit,
+      orderBy: sorting.orderBy,
+      select: caseListSelect,
+    }),
+    prisma.casiAccidente.count({ where }),
+  ]);
 
-  return casos.map((caso) => ({
-    id: caso.id,
-    correlativo: caso.correlativo,
-    fechaEvento: caso.fechaHoraEvento,
-    fechaReporte: caso.fechaReporte,
-    area: caso.area,
-    proceso: caso.proceso,
-    tipoEvento: caso.tipoEvento,
-    criticidad: caso.criticidad,
-    estado: caso.estadoCaso,
-    usuarioReporta: caso.reportadoPor,
-    descripcionCorta:
-      caso.descripcion.length > 160 ? `${caso.descripcion.slice(0, 157)}...` : caso.descripcion,
-  }));
+  return {
+    casos: casos.map((caso) => ({
+      id: caso.id,
+      correlativo: caso.correlativo,
+      fechaEvento: caso.fechaHoraEvento,
+      fechaReporte: caso.fechaReporte,
+      lugar: caso.ubicacion,
+      area: caso.area,
+      proceso: caso.proceso,
+      tipoEvento: caso.tipoEvento,
+      criticidad: caso.criticidad,
+      estado: caso.estadoCaso,
+      usuarioReporta: caso.reportadoPor,
+      brigadaReportante: caso.brigadaReportante,
+      createdAt: caso.createdAt,
+    })),
+    pagination: buildPagination({ ...pagination, totalItems }),
+    sort: { sortBy: sorting.sortBy, sortDir: sorting.sortDir },
+  };
 }
 
 async function getCaseById(id) {
@@ -226,7 +431,8 @@ async function getCaseById(id) {
   return serializeCase(caso);
 }
 
-async function updateCase(id, input = {}, usuarioId) {
+async function updateCase(id, input = {}, user) {
+  const usuarioId = user.id;
   const casoId = parsePositiveId(id, 'id');
 
   if (
@@ -247,6 +453,7 @@ async function updateCase(id, input = {}, usuarioId) {
       tipoEventoId: true,
       criticidadId: true,
       estadoCasoId: true,
+      brigadaReportanteId: true,
     },
   });
 
@@ -282,6 +489,12 @@ async function updateCase(id, input = {}, usuarioId) {
   if (input.descripcion !== undefined) {
     data.descripcion = validateText(input.descripcion, 'descripcion');
     changedFields.push('descripción');
+  }
+
+  const brigadaReportanteId = await resolveBrigadaForUpdate(input, user);
+  if (brigadaReportanteId !== undefined) {
+    data.brigadaReportanteId = brigadaReportanteId;
+    changedFields.push('brigada reportante');
   }
 
   if (changedFields.length === 0) {

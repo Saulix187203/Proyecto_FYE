@@ -5,6 +5,15 @@ async function create(req, res) {
   res.status(201).json({ success: true, message: 'Acción correctiva creada correctamente', data: { accion } });
 }
 
+async function list(req, res) {
+  const data = await actionsService.listActions(req.query);
+  res.status(200).json({
+    success: true,
+    message: 'Acciones correctivas obtenidas correctamente',
+    data,
+  });
+}
+
 async function listByCase(req, res) {
   const acciones = await actionsService.listByCase(req.params.idCaso);
   res.status(200).json({ success: true, message: 'Acciones obtenidas correctamente', data: { acciones } });
@@ -40,4 +49,4 @@ async function returnAction(req, res) {
   res.status(200).json({ success: true, message: 'Acción devuelta correctamente', data });
 }
 
-module.exports = { create, listByCase, getById, update, start, sendToValidation, close, returnAction };
+module.exports = { create, list, listByCase, getById, update, start, sendToValidation, close, returnAction };

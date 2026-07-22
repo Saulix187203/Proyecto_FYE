@@ -2,6 +2,15 @@ const prisma = require('../config/prisma');
 const AppError = require('../utils/app-error');
 
 const safeUserSelect = { id: true, nombre: true, correo: true };
+const brigadaReportanteSelect = {
+  id: true,
+  numero: true,
+  nombre: true,
+  tipoBrigada: { select: { id: true, nombre: true, descripcion: true } },
+  region: { select: { id: true, nombre: true, codigo: true } },
+  departamento: { select: { id: true, nombre: true, codigo: true } },
+  municipio: { select: { id: true, nombre: true, codigo: true } },
+};
 
 function parseCaseId(value) {
   const parsed = typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : value;
@@ -22,6 +31,7 @@ async function getCaseFile(idCaso) {
       criticidad: { select: { id: true, nombre: true, color: true } },
       estadoCaso: { select: { id: true, nombre: true } },
       reportadoPor: { select: safeUserSelect },
+      brigadaReportante: { select: brigadaReportanteSelect },
       reporteInicial: true,
       validacionesProcedencia: {
         orderBy: { fechaValidacion: 'asc' },
@@ -78,6 +88,7 @@ async function getCaseFile(idCaso) {
       criticidad: caso.criticidad,
       estado: caso.estadoCaso,
       usuarioReporta: caso.reportadoPor,
+      brigadaReportante: caso.brigadaReportante,
       createdAt: caso.createdAt,
       updatedAt: caso.updatedAt,
     },

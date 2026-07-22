@@ -9,6 +9,7 @@ const canExecute = roleMiddleware(['Administrador', 'Responsable del Proceso', '
 const canValidate = roleMiddleware(['Administrador', 'SYMA', 'Gestión y Control SYMA']);
 
 router.use(authMiddleware);
+router.get('/', actionsController.list);
 router.get('/caso/:idCaso', actionsController.listByCase);
 router.get('/:id', actionsController.getById);
 router.post('/', canManage, actionsController.create);

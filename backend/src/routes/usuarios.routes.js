@@ -12,6 +12,8 @@ router.get('/', usuariosController.list);
 router.get('/:id', usuariosController.getById);
 router.post('/', usuariosController.create);
 router.put('/:id', usuariosController.update);
+router.put('/:id/roles', usuariosController.updateRoles);
+router.put('/:id/password', usuariosController.updatePassword);
 router.delete('/:id', usuariosController.remove);
 
 module.exports = router;

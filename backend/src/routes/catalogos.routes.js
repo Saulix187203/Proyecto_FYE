@@ -11,5 +11,9 @@ router.get('/tipos-evento', catalogosController.tiposEvento);
 router.get('/criticidades', catalogosController.criticidades);
 router.get('/estados-caso', catalogosController.estadosCaso);
 router.get('/estados-accion', catalogosController.estadosAccion);
+router.get('/regiones', catalogosController.regiones);
+router.get('/departamentos', catalogosController.departamentos);
+router.get('/municipios', catalogosController.municipios);
+router.get('/tipos-brigada', catalogosController.tiposBrigada);
 
 module.exports = router;

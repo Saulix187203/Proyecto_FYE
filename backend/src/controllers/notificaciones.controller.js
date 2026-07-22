@@ -1,11 +1,11 @@
 const notificationsService = require('../services/notificaciones.service');
 
 async function list(req, res) {
-  const notificaciones = await notificationsService.listNotifications(req.user.id, req.query);
+  const data = await notificationsService.listNotifications(req.user.id, req.query);
   res.status(200).json({
     success: true,
     message: 'Notificaciones obtenidas correctamente',
-    data: { notificaciones },
+    data,
   });
 }
 

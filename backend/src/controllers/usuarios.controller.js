@@ -40,6 +40,26 @@ async function update(req, res) {
   });
 }
 
+async function updateRoles(req, res) {
+  const usuario = await usuariosService.updateUsuarioRoles(req.params.id, req.body);
+
+  res.status(200).json({
+    success: true,
+    message: 'Roles del usuario actualizados correctamente',
+    data: { usuario },
+  });
+}
+
+async function updatePassword(req, res) {
+  const usuario = await usuariosService.updateUsuarioPassword(req.params.id, req.body);
+
+  res.status(200).json({
+    success: true,
+    message: 'Contraseña actualizada correctamente',
+    data: { usuario },
+  });
+}
+
 async function remove(req, res) {
   const usuario = await usuariosService.deactivateUsuario(req.params.id);
 
@@ -50,4 +70,4 @@ async function remove(req, res) {
   });
 }
 
-module.exports = { list, getById, create, update, remove };
+module.exports = { list, getById, create, update, updateRoles, updatePassword, remove };
