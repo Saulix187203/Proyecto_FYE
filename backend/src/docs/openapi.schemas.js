@@ -103,6 +103,17 @@ const schemas = {
       updatedAt: { type: 'string', format: 'date-time' },
     },
   },
+  UsuarioOpcion: {
+    type: 'object',
+    required: ['id', 'nombre', 'correo'],
+    description:
+      'Proyección liviana para selectores remotos. No contiene roles ni datos administrativos.',
+    properties: {
+      id: { type: 'integer', example: 12 },
+      nombre: { type: 'string', example: 'Usuario SISCA' },
+      correo: { type: 'string', format: 'email', example: 'usuario@sisca.local' },
+    },
+  },
   Caso: {
     type: 'object',
     required: ['id', 'correlativo', 'fechaEvento', 'estado'],
@@ -143,6 +154,25 @@ const schemas = {
       miembrosActivos: { type: 'integer', minimum: 0, example: 6 },
       createdAt: { type: 'string', format: 'date-time' },
       updatedAt: { type: 'string', format: 'date-time' },
+    },
+  },
+  BrigadaOpcion: {
+    type: 'object',
+    required: ['id', 'numero', 'nombre', 'tipoBrigada', 'region'],
+    properties: {
+      id: { type: 'integer', example: 8 },
+      numero: { type: 'string', example: 'BR-008' },
+      nombre: { type: 'string', example: 'Brigada Central' },
+      tipoBrigada: { $ref: '#/components/schemas/Catalogo' },
+      region: { $ref: '#/components/schemas/Catalogo' },
+      departamento: {
+        allOf: [{ $ref: '#/components/schemas/Catalogo' }],
+        nullable: true,
+      },
+      municipio: {
+        allOf: [{ $ref: '#/components/schemas/Catalogo' }],
+        nullable: true,
+      },
     },
   },
   BrigadaMiembro: {
@@ -246,6 +276,54 @@ const schemas = {
       totalCasosConBrigada: { type: 'integer', minimum: 0, example: 1180 },
       totalCasosSinBrigada: { type: 'integer', minimum: 0, example: 70 },
       brigadasConCasosAbiertos: { type: 'integer', minimum: 0, example: 18 },
+    },
+  },
+  DashboardCasosPorBrigadaItem: {
+    type: 'object',
+    required: [
+      'brigadaId',
+      'numero',
+      'nombre',
+      'region',
+      'departamento',
+      'municipio',
+      'totalCasos',
+    ],
+    properties: {
+      brigadaId: { type: 'integer', minimum: 1 },
+      numero: { type: 'string' },
+      nombre: { type: 'string' },
+      region: { type: 'string' },
+      departamento: { type: 'string' },
+      municipio: { type: 'string' },
+      totalCasos: { type: 'integer', minimum: 0 },
+    },
+  },
+  DashboardIntegrantesPorBrigadaItem: {
+    type: 'object',
+    required: [
+      'brigadaId',
+      'numero',
+      'nombre',
+      'totalIntegrantesActivos',
+      'totalLideresActivos',
+    ],
+    properties: {
+      brigadaId: { type: 'integer', minimum: 1 },
+      numero: { type: 'string' },
+      nombre: { type: 'string' },
+      totalIntegrantesActivos: { type: 'integer', minimum: 0 },
+      totalLideresActivos: { type: 'integer', minimum: 0 },
+    },
+  },
+  DashboardCasosAbiertosPorBrigadaItem: {
+    type: 'object',
+    required: ['brigadaId', 'numero', 'nombre', 'casosAbiertos'],
+    properties: {
+      brigadaId: { type: 'integer', minimum: 1 },
+      numero: { type: 'string' },
+      nombre: { type: 'string' },
+      casosAbiertos: { type: 'integer', minimum: 0 },
     },
   },
 };

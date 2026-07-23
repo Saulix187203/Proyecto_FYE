@@ -1,0 +1,7 @@
+node_modules
+.env
+npm-debug.log*
+coverage
+docs
+uploads/evidencias/*
+!uploads/evidencias/.gitkeep
