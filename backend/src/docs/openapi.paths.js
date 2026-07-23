@@ -167,9 +167,32 @@ const paths = {
   '/usuarios': {
     get: operation({
       tag: 'Usuarios',
-      summary: 'Listar usuarios',
+      summary: 'Listar usuarios de forma paginada',
       operationId: 'listUsuarios',
-      dataSchema: objectSchema({ usuarios: arrayOf(ref('Usuario')) }, ['usuarios']),
+      description:
+        'Endpoint administrativo paginado. Permite buscar por nombre o correo, filtrar por estado y rol, y ordenar únicamente por los campos permitidos.',
+      parameters: [
+        parameterRef('Page'),
+        queryParameter('limit', 'Elementos por página (máximo 500).', {
+          type: 'integer',
+          minimum: 1,
+          maximum: 500,
+          default: 50,
+        }),
+        queryParameter('texto', 'Búsqueda parcial, sin distinguir mayúsculas, por nombre o correo.'),
+        queryParameter('activo', 'Filtra usuarios activos o inactivos.', { type: 'boolean' }),
+        queryParameter('rol', 'Identificador numérico del rol.', {
+          type: 'integer',
+          minimum: 1,
+        }),
+        queryParameter('sortBy', 'Campo de ordenamiento permitido.', {
+          type: 'string',
+          enum: ['id', 'nombre', 'correo', 'activo', 'ultimoAcceso', 'createdAt'],
+          default: 'nombre',
+        }),
+        sortDirectionParameter,
+      ],
+      dataSchema: paginatedData('usuarios', ref('Usuario')),
     }),
     post: operation({
       tag: 'Usuarios',
@@ -192,6 +215,30 @@ const paths = {
         ),
       ),
       dataSchema: objectSchema({ usuario: ref('Usuario') }, ['usuario']),
+    }),
+  },
+  '/usuarios/opciones': {
+    get: operation({
+      tag: 'Usuarios',
+      summary: 'Buscar opciones de usuarios para selectores',
+      operationId: 'listUsuarioOpciones',
+      description:
+        'Devuelve una proyección liviana y paginada para selectores remotos de brigadas y responsables. Requiere uno de los roles funcionales autorizados y no está disponible para Extractor API.',
+      parameters: [
+        parameterRef('Page'),
+        queryParameter('limit', 'Opciones por página (máximo 100).', {
+          type: 'integer',
+          minimum: 1,
+          maximum: 100,
+          default: 20,
+        }),
+        queryParameter('texto', 'Búsqueda parcial, sin distinguir mayúsculas, por nombre o correo.'),
+        queryParameter('activo', 'Filtra usuarios activos o inactivos; por defecto true.', {
+          type: 'boolean',
+          default: true,
+        }),
+      ],
+      dataSchema: paginatedData('usuarios', ref('UsuarioOpcion')),
     }),
   },
   '/usuarios/{id}': {
@@ -811,9 +858,15 @@ paths['/brigadas'] = {
     summary: 'Listar brigadas',
     operationId: 'listBrigadas',
     description:
-      'Sin parámetros de paginación conserva la respuesta compatible del módulo. Al enviar `page`, `limit`, `sortBy` o `sortDir`, devuelve metadata paginada. El límite máximo es 1000.',
+      'Sin parámetros de paginación conserva `data.brigadas` para compatibilidad con integraciones existentes. Al enviar `page`, `limit`, `sortBy` o `sortDir`, devuelve metadata paginada. El límite máximo paginado es 500.',
     parameters: [
-      ...paginationParameters,
+      parameterRef('Page'),
+      queryParameter('limit', 'Cantidad de brigadas por página; máximo 500.', {
+        type: 'integer',
+        minimum: 1,
+        maximum: 500,
+        default: 50,
+      }),
       queryParameter('sortBy', 'Campo de ordenamiento.', {
         type: 'string',
         enum: ['id', 'numero', 'nombre', 'activo', 'createdAt'],
@@ -834,7 +887,10 @@ paths['/brigadas'] = {
       queryParameter('municipioId', 'Filtra por municipio.', { type: 'integer', minimum: 1 }),
     ],
     dataSchema: {
-      oneOf: [arrayOf(ref('Brigada')), paginatedData('brigadas', ref('Brigada'))],
+      oneOf: [
+        objectSchema({ brigadas: arrayOf(ref('Brigada')) }, ['brigadas']),
+        paginatedData('brigadas', ref('Brigada')),
+      ],
     },
   }),
   post: operation({
@@ -847,6 +903,47 @@ paths['/brigadas'] = {
       required: ['numero', 'nombre', 'tipoBrigadaId', 'regionId'],
     }),
     dataSchema: objectSchema({ brigada: ref('Brigada') }, ['brigada']),
+  }),
+};
+
+paths['/brigadas/opciones'] = {
+  get: operation({
+    tag: 'Brigadas',
+    summary: 'Buscar opciones livianas de brigada',
+    operationId: 'listBrigadaOptions',
+    description:
+      'Proyección paginada para filtros y autocompletes. Devuelve 20 elementos por defecto y hasta 100; omite miembros, conteos, fechas y relaciones administrativas. No está disponible para Extractor API.',
+    parameters: [
+      parameterRef('Page'),
+      queryParameter('limit', 'Cantidad de opciones por página; máximo 100.', {
+        type: 'integer',
+        minimum: 1,
+        maximum: 100,
+        default: 20,
+      }),
+      queryParameter('texto', 'Busca por número o nombre.', { type: 'string', maxLength: 150 }),
+      queryParameter('activo', 'Filtra por estado; por defecto es true.', {
+        type: 'boolean',
+        default: true,
+      }),
+      queryParameter('tipoBrigadaId', 'Filtra por tipo de brigada.', {
+        type: 'integer',
+        minimum: 1,
+      }),
+      queryParameter('regionId', 'Filtra por región.', { type: 'integer', minimum: 1 }),
+      queryParameter('departamentoId', 'Filtra por departamento.', {
+        type: 'integer',
+        minimum: 1,
+      }),
+      queryParameter('municipioId', 'Filtra por municipio.', { type: 'integer', minimum: 1 }),
+    ],
+    dataSchema: objectSchema(
+      {
+        brigadas: arrayOf(ref('BrigadaOpcion')),
+        pagination: ref('PaginationMetadata'),
+      },
+      ['brigadas', 'pagination'],
+    ),
   }),
 };
 
@@ -994,6 +1091,16 @@ const brigadaDashboardFilters = [
   queryParameter('municipio', 'Id de municipio.', { type: 'integer', minimum: 1 }),
   queryParameter('tipoBrigada', 'Id de tipo de brigada.', { type: 'integer', minimum: 1 }),
 ];
+const brigadaRankingLimitParameter = queryParameter(
+  'limit',
+  'Cantidad máxima del ranking. El frontend usa 10; máximo 100. Si se omite, se conserva el listado completo por compatibilidad.',
+  { type: 'integer', minimum: 1, maximum: 100, example: 10 },
+);
+const brigadaRankingSchemas = {
+  'casos-por-brigada': ref('DashboardCasosPorBrigadaItem'),
+  'integrantes-por-brigada': ref('DashboardIntegrantesPorBrigadaItem'),
+  'casos-abiertos-por-brigada': ref('DashboardCasosAbiertosPorBrigadaItem'),
+};
 
 const brigadaDashboardEndpoints = [
   ['resumen', 'Obtener resumen de brigadas', 'getDashboardBrigadasResumen'],
@@ -1018,16 +1125,26 @@ const brigadaDashboardEndpoints = [
 ];
 
 for (const [path, summary, operationId] of brigadaDashboardEndpoints) {
+  const rankingSchema = brigadaRankingSchemas[path];
   paths[`/dashboard/brigadas/${path}`] = {
     get: operation({
       tag: 'Dashboard',
       summary,
       operationId,
-      parameters: brigadaDashboardFilters,
+      description: rankingSchema
+        ? 'Cuando se envía `limit`, PostgreSQL devuelve directamente el Top N con orden estable. Los valores cero se incluyen sólo si no hay suficientes brigadas con valores positivos.'
+        : undefined,
+      parameters: rankingSchema
+        ? [...brigadaDashboardFilters, brigadaRankingLimitParameter]
+        : brigadaDashboardFilters,
       dataSchema:
         path === 'resumen'
           ? ref('DashboardBrigadasResumen')
-          : objectSchema({ items: arrayOf({ type: 'object', additionalProperties: true }) }),
+          : objectSchema({
+              items: arrayOf(
+                rankingSchema ?? { type: 'object', additionalProperties: true },
+              ),
+            }),
     }),
   };
 }

@@ -1,12 +1,22 @@
 const usuariosService = require('../services/usuarios.service');
 
 async function list(req, res) {
-  const usuarios = await usuariosService.listUsuarios();
+  const data = await usuariosService.listUsuarios(req.query);
 
   res.status(200).json({
     success: true,
     message: 'Usuarios obtenidos correctamente',
-    data: { usuarios },
+    data,
+  });
+}
+
+async function listOpciones(req, res) {
+  const data = await usuariosService.listUsuarioOpciones(req.query);
+
+  res.status(200).json({
+    success: true,
+    message: 'Opciones de usuarios obtenidas correctamente',
+    data,
   });
 }
 
@@ -70,4 +80,13 @@ async function remove(req, res) {
   });
 }
 
-module.exports = { list, getById, create, update, updateRoles, updatePassword, remove };
+module.exports = {
+  list,
+  listOpciones,
+  getById,
+  create,
+  update,
+  updateRoles,
+  updatePassword,
+  remove,
+};

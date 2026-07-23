@@ -1,8 +1,20 @@
 const prisma = require('../config/prisma');
 const AppError = require('../utils/app-error');
 const { hashPassword } = require('../utils/password');
+const { parsePagination, parseSorting, buildPagination } = require('../utils/pagination');
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const USUARIOS_MAX_LIMIT = 500;
+const OPCIONES_DEFAULT_LIMIT = 20;
+const OPCIONES_MAX_LIMIT = 100;
+const USUARIO_SORT_FIELDS = {
+  id: 'id',
+  nombre: 'nombre',
+  correo: 'correo',
+  activo: 'activo',
+  ultimoAcceso: 'ultimoAcceso',
+  createdAt: 'createdAt',
+};
 
 const usuarioSelect = {
   id: true,
@@ -45,6 +57,57 @@ function parseUsuarioId(id) {
   }
 
   return usuarioId;
+}
+
+function parseTexto(value) {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (typeof value !== 'string') {
+    throw new AppError('texto debe ser una cadena', 400);
+  }
+
+  const texto = value.trim();
+  if (!texto) return undefined;
+  if (texto.length > 255) {
+    throw new AppError('texto debe tener hasta 255 caracteres', 400);
+  }
+
+  return texto;
+}
+
+function parseActivo(value, defaultValue) {
+  if (value === undefined || value === null || value === '') return defaultValue;
+  if (value === true || value === 'true') return true;
+  if (value === false || value === 'false') return false;
+  throw new AppError('activo debe ser true o false', 400);
+}
+
+function parseRol(value) {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (!/^\d+$/.test(String(value))) {
+    throw new AppError('rol debe ser un ID entero positivo', 400);
+  }
+
+  const rol = Number(value);
+  if (!Number.isSafeInteger(rol) || rol < 1) {
+    throw new AppError('rol debe ser un ID entero positivo', 400);
+  }
+
+  return rol;
+}
+
+function buildUsuariosWhere({ texto, activo, rol }) {
+  return {
+    ...(texto
+      ? {
+          OR: [
+            { nombre: { contains: texto, mode: 'insensitive' } },
+            { correo: { contains: texto, mode: 'insensitive' } },
+          ],
+        }
+      : {}),
+    ...(activo === undefined ? {} : { activo }),
+    ...(rol === undefined ? {} : { roles: { some: { rolId: rol } } }),
+  };
 }
 
 function validateNombre(nombre, required = true) {
@@ -142,13 +205,65 @@ async function getExistingRoles(client, roles) {
   return existingRoles;
 }
 
-async function listUsuarios() {
-  const usuarios = await prisma.usuario.findMany({
-    orderBy: { id: 'asc' },
-    select: usuarioSelect,
+async function listUsuarios(query = {}) {
+  const pagination = parsePagination(query, {
+    defaultLimit: 50,
+    maxLimit: USUARIOS_MAX_LIMIT,
+  });
+  const sorting = parseSorting(query, USUARIO_SORT_FIELDS, {
+    sortBy: 'nombre',
+    sortDir: 'asc',
+  });
+  const where = buildUsuariosWhere({
+    texto: parseTexto(query.texto),
+    activo: parseActivo(query.activo, undefined),
+    rol: parseRol(query.rol),
   });
 
-  return usuarios.map(serializeUsuario);
+  const [usuarios, totalItems] = await prisma.$transaction([
+    prisma.usuario.findMany({
+      where,
+      orderBy: sorting.orderBy,
+      skip: pagination.skip,
+      take: pagination.limit,
+      select: usuarioSelect,
+    }),
+    prisma.usuario.count({ where }),
+  ]);
+
+  return {
+    usuarios: usuarios.map(serializeUsuario),
+    pagination: buildPagination({ ...pagination, totalItems }),
+    sort: { sortBy: sorting.sortBy, sortDir: sorting.sortDir },
+  };
+}
+
+async function listUsuarioOpciones(query = {}) {
+  const pagination = parsePagination(query, {
+    defaultLimit: OPCIONES_DEFAULT_LIMIT,
+    maxLimit: OPCIONES_MAX_LIMIT,
+  });
+  const where = buildUsuariosWhere({
+    texto: parseTexto(query.texto),
+    activo: parseActivo(query.activo, true),
+    rol: undefined,
+  });
+
+  const [usuarios, totalItems] = await prisma.$transaction([
+    prisma.usuario.findMany({
+      where,
+      orderBy: [{ nombre: 'asc' }, { id: 'asc' }],
+      skip: pagination.skip,
+      take: pagination.limit,
+      select: { id: true, nombre: true, correo: true },
+    }),
+    prisma.usuario.count({ where }),
+  ]);
+
+  return {
+    usuarios,
+    pagination: buildPagination({ ...pagination, totalItems }),
+  };
 }
 
 async function getUsuarioById(id) {
@@ -315,6 +430,7 @@ async function deactivateUsuario(id) {
 
 module.exports = {
   listUsuarios,
+  listUsuarioOpciones,
   getUsuarioById,
   createUsuario,
   updateUsuario,

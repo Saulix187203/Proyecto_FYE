@@ -15,11 +15,21 @@ const canRead = roleMiddleware([
   'Gerencia',
   'Extractor API',
 ]);
+const canUseOptions = roleMiddleware([
+  'Administrador',
+  'SYMA',
+  'PRL Contratista',
+  'Responsable del Proceso',
+  'Brigada',
+  'Gestión y Control SYMA',
+  'Gerencia',
+]);
 const onlyAdministrator = roleMiddleware(['Administrador']);
 const denyExtractor = denyRoleMiddleware(['Extractor API']);
 
 router.use(authMiddleware);
 router.get('/mis-brigadas', denyExtractor, brigadasController.misBrigadas);
+router.get('/opciones', canUseOptions, brigadasController.listOptions);
 router.get('/', canRead, brigadasController.list);
 router.get('/:id', canRead, brigadasController.getById);
 router.get('/:id/miembros', canRead, brigadasController.listMiembros);

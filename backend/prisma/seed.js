@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
 const { PrismaClient } = require('@prisma/client');
 const geografiaGuatemala = require('./data/geografia-guatemala');
+const { synchronizeGeography } = require('./lib/seed-geografia-lib');
 
 const prisma = new PrismaClient();
 
@@ -72,26 +73,6 @@ const procesos = [
   { area: 'Seguridad Industrial', nombre: 'Gestión de seguridad industrial' },
 ];
 
-const regiones = geografiaGuatemala.map(({ nombre, codigo }) => ({ nombre, codigo }));
-
-const departamentos = geografiaGuatemala.flatMap((region) =>
-  region.departamentos.map(({ nombre, codigo }) => ({
-    nombre,
-    codigo,
-    region: region.nombre,
-  })),
-);
-
-const municipios = geografiaGuatemala.flatMap((region) =>
-  region.departamentos.flatMap((departamento) =>
-    departamento.municipios.map(({ nombre, codigo }) => ({
-      nombre,
-      codigo,
-      departamento: departamento.nombre,
-    })),
-  ),
-);
-
 const tiposBrigada = [
   'Brigada de Emergencia',
   'Brigada de Primeros Auxilios',
@@ -129,15 +110,7 @@ async function main() {
   await upsertNamedCatalog(prisma.area, areas);
   await upsertNamedCatalog(prisma.tipoBrigada, tiposBrigada);
 
-  await Promise.all(
-    regiones.map(({ nombre, codigo }) =>
-      prisma.region.upsert({
-        where: { nombre },
-        update: { codigo, activo: true },
-        create: { nombre, codigo, activo: true },
-      }),
-    ),
-  );
+  await synchronizeGeography({ prisma, geography: geografiaGuatemala });
 
   const areasCreadas = await prisma.area.findMany({
     where: { nombre: { in: areas } },
@@ -157,52 +130,6 @@ async function main() {
         where: { areaId_nombre: { areaId, nombre } },
         update: { activo: true },
         create: { areaId, nombre },
-      });
-    }),
-  );
-
-  const regionesCreadas = await prisma.region.findMany({
-    where: { nombre: { in: regiones.map((region) => region.nombre) } },
-    select: { id: true, nombre: true },
-  });
-  const regionIdPorNombre = new Map(regionesCreadas.map((region) => [region.nombre, region.id]));
-
-  await Promise.all(
-    departamentos.map(({ nombre, codigo, region }) => {
-      const regionId = regionIdPorNombre.get(region);
-
-      if (!regionId) {
-        throw new Error(`No se encontró la región requerida para el departamento: ${region}`);
-      }
-
-      return prisma.departamento.upsert({
-        where: { regionId_nombre: { regionId, nombre } },
-        update: { codigo, activo: true },
-        create: { nombre, codigo, regionId, activo: true },
-      });
-    }),
-  );
-
-  const departamentosCreados = await prisma.departamento.findMany({
-    where: { nombre: { in: departamentos.map((departamento) => departamento.nombre) } },
-    select: { id: true, nombre: true },
-  });
-  const departamentoIdPorNombre = new Map(
-    departamentosCreados.map((departamento) => [departamento.nombre, departamento.id]),
-  );
-
-  await Promise.all(
-    municipios.map(({ nombre, codigo, departamento }) => {
-      const departamentoId = departamentoIdPorNombre.get(departamento);
-
-      if (!departamentoId) {
-        throw new Error(`No se encontró el departamento requerido para el municipio: ${departamento}`);
-      }
-
-      return prisma.municipio.upsert({
-        where: { departamentoId_nombre: { departamentoId, nombre } },
-        update: { codigo, activo: true },
-        create: { nombre, codigo, departamentoId, activo: true },
       });
     }),
   );

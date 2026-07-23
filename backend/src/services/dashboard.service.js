@@ -3,6 +3,7 @@ const AppError = require('../utils/app-error');
 const { parsePagination, buildPagination } = require('../utils/pagination');
 
 const CLOSED_CASE_STATES = ['Cerrado', 'Rechazado'];
+const DASHBOARD_RANKING_MAX_LIMIT = 100;
 
 function parseOptionalPositiveId(value, field) {
   if (value === undefined || value === null || value === '') return undefined;
@@ -30,6 +31,20 @@ function buildBrigadaWhere(query = {}) {
   };
 }
 
+function parseOptionalRankingLimit(value) {
+  if (value === undefined || value === null || value === '') return null;
+  if (!/^\d+$/.test(String(value))) {
+    throw new AppError('limit debe ser un entero positivo', 400);
+  }
+
+  const limit = Number(value);
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > DASHBOARD_RANKING_MAX_LIMIT) {
+    throw new AppError(`limit debe estar entre 1 y ${DASHBOARD_RANKING_MAX_LIMIT}`, 400);
+  }
+
+  return limit;
+}
+
 function hasFilters(where) {
   return Object.keys(where).length > 0;
 }
@@ -49,6 +64,111 @@ function getFilteredBrigadas(brigadaWhere) {
     orderBy: [{ numero: 'asc' }, { id: 'asc' }],
     select: brigadaDashboardSelect,
   });
+}
+
+async function getRankedBrigadas(brigadaWhere, groups, groupIdField, limit) {
+  const rankedIds = groups.map((group) => group[groupIdField]).filter(Boolean);
+
+  if (rankedIds.length < limit) {
+    const zeroBrigadas = await prisma.brigada.findMany({
+      where: {
+        ...brigadaWhere,
+        ...(rankedIds.length ? { id: { notIn: rankedIds } } : {}),
+      },
+      orderBy: { id: 'asc' },
+      take: limit - rankedIds.length,
+      select: { id: true },
+    });
+    rankedIds.push(...zeroBrigadas.map((brigada) => brigada.id));
+  }
+
+  const brigadas = await prisma.brigada.findMany({
+    where: { id: { in: rankedIds } },
+    select: brigadaDashboardSelect,
+  });
+  const brigadasById = new Map(brigadas.map((brigada) => [brigada.id, brigada]));
+
+  return rankedIds.map((id) => brigadasById.get(id)).filter(Boolean);
+}
+
+async function getTopCasesByBrigada(brigadaWhere, limit, { openOnly = false } = {}) {
+  const filterByBrigada = hasFilters(brigadaWhere);
+  const groups = await prisma.casiAccidente.groupBy({
+    by: ['brigadaReportanteId'],
+    where: {
+      brigadaReportanteId: { not: null },
+      ...(filterByBrigada ? { brigadaReportante: brigadaWhere } : {}),
+      ...(openOnly
+        ? { estadoCaso: { nombre: { notIn: CLOSED_CASE_STATES } } }
+        : {}),
+    },
+    _count: { _all: true },
+    orderBy: [
+      { _count: { brigadaReportanteId: 'desc' } },
+      { brigadaReportanteId: 'asc' },
+    ],
+    take: limit,
+  });
+  const brigadas = await getRankedBrigadas(
+    brigadaWhere,
+    groups,
+    'brigadaReportanteId',
+    limit,
+  );
+  const countsByBrigada = new Map(
+    groups.map((group) => [group.brigadaReportanteId, group._count._all]),
+  );
+
+  return brigadas.map((brigada) => ({
+    brigadaId: brigada.id,
+    numero: brigada.numero,
+    nombre: brigada.nombre,
+    ...(openOnly
+      ? { casosAbiertos: countsByBrigada.get(brigada.id) ?? 0 }
+      : {
+          region: brigada.region?.nombre ?? 'Sin región',
+          departamento: brigada.departamento?.nombre ?? 'Sin departamento',
+          municipio: brigada.municipio?.nombre ?? 'Sin municipio',
+          totalCasos: countsByBrigada.get(brigada.id) ?? 0,
+        }),
+  }));
+}
+
+async function getTopActiveMembersByBrigada(brigadaWhere, limit) {
+  const filterByBrigada = hasFilters(brigadaWhere);
+  const groups = await prisma.brigadaMiembro.groupBy({
+    by: ['brigadaId'],
+    where: {
+      activo: true,
+      ...(filterByBrigada ? { brigada: brigadaWhere } : {}),
+    },
+    _count: { _all: true },
+    orderBy: [{ _count: { brigadaId: 'desc' } }, { brigadaId: 'asc' }],
+    take: limit,
+  });
+  const brigadas = await getRankedBrigadas(brigadaWhere, groups, 'brigadaId', limit);
+  const brigadaIds = brigadas.map((brigada) => brigada.id);
+  const leaderGroups = brigadaIds.length
+    ? await prisma.brigadaMiembro.groupBy({
+        by: ['brigadaId'],
+        where: { brigadaId: { in: brigadaIds }, activo: true, esLider: true },
+        _count: { _all: true },
+      })
+    : [];
+  const membersByBrigada = new Map(
+    groups.map((group) => [group.brigadaId, group._count._all]),
+  );
+  const leadersByBrigada = new Map(
+    leaderGroups.map((group) => [group.brigadaId, group._count._all]),
+  );
+
+  return brigadas.map((brigada) => ({
+    brigadaId: brigada.id,
+    numero: brigada.numero,
+    nombre: brigada.nombre,
+    totalIntegrantesActivos: membersByBrigada.get(brigada.id) ?? 0,
+    totalLideresActivos: leadersByBrigada.get(brigada.id) ?? 0,
+  }));
 }
 
 async function getCaseCountsByBrigada(brigadas, { openOnly = false } = {}) {
@@ -331,7 +451,11 @@ async function getBrigadaCasesByMunicipio(query = {}) {
 }
 
 async function getCasesByBrigada(query = {}) {
-  const brigadas = await getFilteredBrigadas(buildBrigadaWhere(query));
+  const brigadaWhere = buildBrigadaWhere(query);
+  const limit = parseOptionalRankingLimit(query.limit);
+  if (limit) return getTopCasesByBrigada(brigadaWhere, limit);
+
+  const brigadas = await getFilteredBrigadas(brigadaWhere);
   const countsByBrigada = await getCaseCountsByBrigada(brigadas);
 
   const items = brigadas.map((brigada) => ({
@@ -348,7 +472,11 @@ async function getCasesByBrigada(query = {}) {
 }
 
 async function getActiveMembersByBrigada(query = {}) {
-  const brigadas = await getFilteredBrigadas(buildBrigadaWhere(query));
+  const brigadaWhere = buildBrigadaWhere(query);
+  const limit = parseOptionalRankingLimit(query.limit);
+  if (limit) return getTopActiveMembersByBrigada(brigadaWhere, limit);
+
+  const brigadas = await getFilteredBrigadas(brigadaWhere);
   const brigadaIds = brigadas.map((brigada) => brigada.id);
 
   if (!brigadaIds.length) return [];
@@ -383,7 +511,11 @@ async function getActiveMembersByBrigada(query = {}) {
 }
 
 async function getOpenCasesByBrigada(query = {}) {
-  const brigadas = await getFilteredBrigadas(buildBrigadaWhere(query));
+  const brigadaWhere = buildBrigadaWhere(query);
+  const limit = parseOptionalRankingLimit(query.limit);
+  if (limit) return getTopCasesByBrigada(brigadaWhere, limit, { openOnly: true });
+
+  const brigadas = await getFilteredBrigadas(brigadaWhere);
   const countsByBrigada = await getCaseCountsByBrigada(brigadas, { openOnly: true });
 
   const items = brigadas.map((brigada) => ({

@@ -5,8 +5,16 @@ const roleMiddleware = require('../middlewares/role.middleware');
 
 const router = Router();
 const onlyAdministrator = roleMiddleware(['Administrador']);
+const canSelectUsuarios = roleMiddleware([
+  'Administrador',
+  'PRL Contratista',
+  'Responsable del Proceso',
+  'SYMA',
+]);
 
-router.use(authMiddleware, onlyAdministrator);
+router.use(authMiddleware);
+router.get('/opciones', canSelectUsuarios, usuariosController.listOpciones);
+router.use(onlyAdministrator);
 
 router.get('/', usuariosController.list);
 router.get('/:id', usuariosController.getById);

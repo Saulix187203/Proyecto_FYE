@@ -11,6 +11,16 @@ async function list(req, res) {
   });
 }
 
+async function listOptions(req, res) {
+  const result = await brigadasService.listBrigadaOptions(req.query);
+
+  res.status(200).json({
+    success: true,
+    message: 'Opciones de brigada obtenidas correctamente',
+    data: result,
+  });
+}
+
 async function getById(req, res) {
   const brigada = await brigadasService.getBrigadaById(req.params.id);
 
@@ -110,6 +120,7 @@ async function misBrigadas(req, res) {
 
 module.exports = {
   list,
+  listOptions,
   getById,
   create,
   update,

@@ -15,6 +15,20 @@ const BRIGADA_RELATIONS = {
   _count: { select: { miembros: { where: { activo: true } } } },
 };
 
+const BRIGADA_OPTION_SELECT = {
+  id: true,
+  numero: true,
+  nombre: true,
+  tipoBrigada: { select: { id: true, nombre: true } },
+  region: { select: { id: true, nombre: true } },
+  departamento: { select: { id: true, nombre: true } },
+  municipio: { select: { id: true, nombre: true } },
+};
+
+const BRIGADA_LIST_MAX_LIMIT = 500;
+const BRIGADA_OPTIONS_DEFAULT_LIMIT = 20;
+const BRIGADA_OPTIONS_MAX_LIMIT = 100;
+
 const MEMBER_RELATIONS = {
   usuario: { select: { id: true, nombre: true, correo: true, activo: true } },
 };
@@ -277,8 +291,8 @@ async function ensureUniqueActiveBrigada({
   }
 }
 
-function buildBrigadaWhere(query = {}) {
-  const activo = parseOptionalBoolean(query.activo, 'activo');
+function buildBrigadaWhere(query = {}, { defaultActivo } = {}) {
+  const activo = parseOptionalBoolean(query.activo, 'activo') ?? defaultActivo;
   const tipoBrigadaId = parseOptionalPositiveId(query.tipoBrigadaId, 'tipoBrigadaId');
   const regionId = parseOptionalPositiveId(query.regionId, 'regionId');
   const departamentoId = parseOptionalPositiveId(query.departamentoId, 'departamentoId');
@@ -321,7 +335,7 @@ async function listBrigadas(query = {}) {
     return brigadas.map(serializeBrigada);
   }
 
-  const pagination = parsePagination(query);
+  const pagination = parsePagination(query, { maxLimit: BRIGADA_LIST_MAX_LIMIT });
   const sorting = parseSorting(query, BRIGADA_SORT_FIELDS, {
     sortBy: 'numero',
     sortDir: 'asc',
@@ -341,6 +355,29 @@ async function listBrigadas(query = {}) {
     brigadas: brigadas.map(serializeBrigada),
     pagination: buildPagination({ ...pagination, totalItems }),
     sort: { sortBy: sorting.sortBy, sortDir: sorting.sortDir },
+  };
+}
+
+async function listBrigadaOptions(query = {}) {
+  const where = buildBrigadaWhere(query, { defaultActivo: true });
+  const pagination = parsePagination(query, {
+    defaultLimit: BRIGADA_OPTIONS_DEFAULT_LIMIT,
+    maxLimit: BRIGADA_OPTIONS_MAX_LIMIT,
+  });
+  const [brigadas, totalItems] = await Promise.all([
+    prisma.brigada.findMany({
+      where,
+      skip: pagination.skip,
+      take: pagination.limit,
+      orderBy: [{ numero: 'asc' }, { id: 'asc' }],
+      select: BRIGADA_OPTION_SELECT,
+    }),
+    prisma.brigada.count({ where }),
+  ]);
+
+  return {
+    brigadas,
+    pagination: buildPagination({ ...pagination, totalItems }),
   };
 }
 
@@ -635,6 +672,7 @@ async function listMisBrigadas(usuarioId) {
 
 module.exports = {
   listBrigadas,
+  listBrigadaOptions,
   getBrigadaById,
   createBrigada,
   updateBrigada,
