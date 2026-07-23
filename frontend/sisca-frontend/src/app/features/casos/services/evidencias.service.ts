@@ -24,12 +24,12 @@ export class EvidenciasService {
     return this.http.post<ApiResponse<any>>(`${environment.apiUrl}/evidencias/accion/${idAccion}`, formData);
   }
 
-  listarCaso(idCaso: number): Observable<ApiResponse<Evidencia[]>> {
-    return this.http.get<ApiResponse<Evidencia[]>>(`${environment.apiUrl}/evidencias/caso/${idCaso}`);
+  listarCaso(idCaso: number): Observable<ApiResponse<{ evidencias: Evidencia[] }>> {
+    return this.http.get<ApiResponse<{ evidencias: Evidencia[] }>>(`${environment.apiUrl}/evidencias/caso/${idCaso}`);
   }
 
-  listarAccion(idAccion: number): Observable<ApiResponse<Evidencia[]>> {
-    return this.http.get<ApiResponse<Evidencia[]>>(`${environment.apiUrl}/evidencias/accion/${idAccion}`);
+  listarAccion(idAccion: number): Observable<ApiResponse<{ evidencias: Evidencia[] }>> {
+    return this.http.get<ApiResponse<{ evidencias: Evidencia[] }>>(`${environment.apiUrl}/evidencias/accion/${idAccion}`);
   }
 
   descargar(idEvidencia: number): Observable<Blob> {

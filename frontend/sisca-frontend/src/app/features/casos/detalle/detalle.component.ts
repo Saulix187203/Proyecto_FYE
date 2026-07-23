@@ -4,11 +4,13 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { CasosService } from '../services/casos.service';
 import { Caso } from '../../../core/models/caso.model';
+import { AuthService } from '../../../core/services/auth.service';
+import { ValidacionProcedenciaComponent } from '../validacion/validacion-procedencia.component';
 
 @Component({
   selector: 'app-detalle-caso',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink, ValidacionProcedenciaComponent],
   template: `
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
       <h2 style="margin:0;">Detalle del Caso</h2>
@@ -56,6 +58,12 @@ import { Caso } from '../../../core/models/caso.model';
           <p><strong>Lugar:</strong> {{ caso.lugar }}</p>
           <p><strong>Creado por:</strong> {{ caso.creadoPor?.nombre || 'N/A' }}</p>
           <p><strong>Fecha Creación:</strong> {{ caso.fechaCreacion | date:'dd/MM/yyyy HH:mm' }}</p>
+          <p><strong>Región:</strong> {{ caso.region?.nombre || 'N/A' }}</p>
+          <p><strong>Departamento:</strong> {{ caso.departamento?.nombre || 'N/A' }}</p>
+          <p><strong>Municipio:</strong> {{ caso.municipio?.nombre || 'N/A' }}</p>
+          <p><strong>Tipo Brigada:</strong> {{ caso.tipoBrigada?.nombre || 'N/A' }}</p>
+          <p><strong>Técnico:</strong> {{ caso.nombreTecnico || 'N/A' }}</p>
+          <p><strong>Código Brigada:</strong> {{ caso.codigoBrigada || 'N/A' }}</p>
         </div>
       </div>
 
@@ -95,15 +103,30 @@ import { Caso } from '../../../core/models/caso.model';
       <hr style="margin:1.5rem 0;">
 
       <!-- Acciones -->
-      <div style="display:flex; gap:1rem; flex-wrap:wrap;">
+      <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:center;">
         <a [routerLink]="['/casos', caso.id, 'expediente']" style="display:inline-block; padding:0.5rem 1rem; background:#007bff; color:white; text-decoration:none; border-radius:4px;">
           📄 Ver Expediente Completo
         </a>
+
+        <!-- Botón para validación de procedencia -->
+        <button *ngIf="mostrarBotonValidacion()" 
+                (click)="abrirValidacion()" 
+                style="padding:0.5rem 1rem; background:#6f42c1; color:white; border:none; border-radius:4px; cursor:pointer;">
+          🔍 Validar procedencia
+        </button>
+
         <button (click)="volver()" style="padding:0.5rem 1rem; background:#6c757d; color:white; border:none; border-radius:4px; cursor:pointer;">
           ← Volver al listado
         </button>
       </div>
     </div>
+
+    <!-- Modal de validación de procedencia -->
+    <app-validacion-procedencia *ngIf="mostrarValidacion && caso"
+      [idCaso]="caso.id"
+      [caso]="caso"
+      (cerrado)="cerrarValidacion($event)">
+    </app-validacion-procedencia>
   `,
   styles: [`
     input, textarea { border: 1px solid #ced4da; border-radius: 4px; }
@@ -116,6 +139,7 @@ export class DetalleCasoComponent implements OnInit {
   private router = inject(Router);
   private casosService = inject(CasosService);
   private fb = inject(FormBuilder);
+  private authService = inject(AuthService);
 
   caso: Caso | null = null;
   cargando = true;
@@ -123,6 +147,9 @@ export class DetalleCasoComponent implements OnInit {
   editando = false;
   editError = '';
   editSuccess = false;
+
+  // Para el modal de validación
+  mostrarValidacion = false;
 
   editForm = this.fb.group({
     lugar: ['', Validators.required],
@@ -205,6 +232,27 @@ export class DetalleCasoComponent implements OnInit {
     this.router.navigate(['/casos']);
   }
 
+  // === MÉTODOS PARA VALIDACIÓN DE PROCEDENCIA ===
+  mostrarBotonValidacion(): boolean {
+    if (!this.caso) return false;
+    const estado = this.caso.estado?.nombre;
+    const rolesValidos = ['Administrador', 'PRL Contratista', 'SYMA'];
+    const tieneRol = rolesValidos.some(r => this.authService.hasRole(r));
+    return tieneRol && (estado === 'Reportado' || estado === 'Devuelto' || estado === 'En revisión');
+  }
+
+  abrirValidacion() {
+    this.mostrarValidacion = true;
+  }
+
+  cerrarValidacion(recargar: boolean) {
+    this.mostrarValidacion = false;
+    if (recargar && this.caso) {
+      this.cargarCaso(this.caso.id);
+    }
+  }
+
+  // === UTILIDADES ===
   getEstadoColor(estado?: string): string {
     const colores: Record<string, string> = {
       'Reportado': '#ffc107',

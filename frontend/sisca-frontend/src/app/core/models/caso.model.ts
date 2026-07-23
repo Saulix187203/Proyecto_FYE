@@ -15,6 +15,14 @@ export interface Caso {
   criticidad: Criticidad | null;
   estado: EstadoCaso | null;
   creadoPor: Usuario | null;
+
+  // NUEVOS CAMPOS (según retroalimentación)
+  region?: any;                // objeto región (id, nombre)
+  departamento?: any;          // objeto departamento
+  municipio?: any;             // objeto municipio
+  tipoBrigada?: any;           // objeto tipo de brigada
+  nombreTecnico?: string;
+  codigoBrigada?: string;
 }
 
 export interface ReporteInicial {
@@ -74,12 +82,13 @@ export interface BitacoraEvento {
   metadata?: any;
 }
 
+// Estructura real del expediente (con datosGenerales)
 export interface Expediente {
-  caso: Caso;
+  datosGenerales: Caso;        // <-- ahora es un Caso con los nuevos campos
   reporteInicial: ReporteInicial | null;
-  validaciones: ValidacionProcedencia[];
-  acciones: AccionCorrectiva[];
+  validacionesProcedencia: ValidacionProcedencia[];
+  accionesCorrectivas: AccionCorrectiva[];
   evidencias: Evidencia[];
-  comentarios: Comentario[];
+  comentariosObservacion: Comentario[];
   bitacora: BitacoraEvento[];
 }
