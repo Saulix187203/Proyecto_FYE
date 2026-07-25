@@ -5,11 +5,12 @@ import { FormsModule } from '@angular/forms';
 import { ExpedienteService, ExpedienteResponse } from '../services/expediente.service';
 import { EvidenciasService } from '../services/evidencias.service';
 import { Evidencia } from '../../../core/models/caso.model';
+import { AccionesCasoComponent } from '../acciones/acciones-caso.component';
 
 @Component({
   selector: 'app-expediente',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, AccionesCasoComponent],
   template: `
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
       <h2 style="margin:0;">Expediente del Caso</h2>
@@ -84,47 +85,24 @@ import { Evidencia } from '../../../core/models/caso.model';
         <p style="color:#6c757d;">Sin validaciones registradas.</p>
       </ng-template>
 
-      <!-- Acciones Correctivas -->
-      <h3>Acciones Correctivas</h3>
-      <div *ngIf="expediente.accionesCorrectivas && expediente.accionesCorrectivas.length > 0; else sinAcciones">
-        <div *ngFor="let a of expediente.accionesCorrectivas" style="background:#f8f9fa; margin-bottom:0.5rem; padding:0.5rem; border-radius:4px; border-left:3px solid #28a745;">
-          <p><strong>{{ a.descripcion }}</strong></p>
-          <p style="margin:0.2rem 0;">
-            <span style="font-weight:bold;">Estado:</span> {{ a.estado?.nombre || 'N/A' }}
-            <span style="margin-left:1rem; font-weight:bold;">Responsable:</span> {{ a.responsable?.nombre || 'N/A' }}
-          </p>
-          <p style="margin:0.2rem 0; font-size:0.9rem; color:#6c757d;">
-            Fecha compromiso: {{ a.fechaCompromiso | date:'dd/MM/yyyy HH:mm' }}
-          </p>
-          <div *ngIf="a.evidencias && a.evidencias.length > 0" style="margin-top:0.3rem;">
-            <span style="font-weight:bold;">Evidencias:</span>
-            <ul style="margin:0.2rem 0 0 1.5rem;">
-              <li *ngFor="let e of a.evidencias">{{ e.nombreOriginal }}</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-      <ng-template #sinAcciones>
-        <p style="color:#6c757d;">No hay acciones correctivas.</p>
-      </ng-template>
+      <!-- Acciones Correctivas (integrado con el nuevo componente) -->
+      <app-acciones-caso
+        [idCaso]="idCaso"
+        [estadoCaso]="expediente.datosGenerales.estado?.nombre"
+        (cambio)="recargarExpediente()">
+      </app-acciones-caso>
 
       <!-- Evidencias del caso -->
       <h3>Evidencias del Caso</h3>
       <div style="background:#f8f9fa; padding:1rem; border-radius:4px; margin-bottom:1rem;">
         <p style="margin:0 0 0.75rem 0; font-weight:bold;">Subir nueva evidencia</p>
-        <p style="margin:0 0 0.75rem 0; color:#6c757d; font-size:0.95rem;">Formatos permitidos: PDF, imágenes (JPG/PNG/WEBP) y archivos Excel (.xls/.xlsx).</p>
+        <p style="margin:0 0 0.75rem 0; color:#6c757d; font-size:0.95rem;">Formatos permitidos: PDF, imágenes (JPG/PNG/WEBP).</p>
         <div style="display:grid; gap:0.75rem; max-width:600px;">
-          <div *ngIf="modoReemplazo && evidenciaEnEdicion" style="background:#fff3cd; padding:0.75rem; border-radius:4px; color:#856404;">
-            Estás sustituyendo la evidencia: <strong>{{ evidenciaEnEdicion.nombreOriginal }}</strong>
-            <button type="button" (click)="cancelarReemplazo()" style="margin-left:0.5rem; background:transparent; border:none; color:#856404; cursor:pointer; text-decoration:underline;">
-              Cancelar
-            </button>
-          </div>
-          <input type="file" (change)="onArchivoSeleccionado($event)" accept=".pdf,.png,.jpg,.jpeg,.webp,.xls,.xlsx,application/pdf,image/png,image/jpeg,image/webp,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+          <input type="file" (change)="onArchivoSeleccionado($event)" accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp" />
           <input type="text" [(ngModel)]="descripcion" placeholder="Descripción de la evidencia" style="padding:0.5rem; border:1px solid #ced4da; border-radius:4px;" />
           <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
-            <button type="button" (click)="subirEvidencia()" [disabled]="subiendo || !archivoSeleccionado" style="padding:0.5rem 1rem; background:#17a2b8; color:white; border:none; border-radius:4px; cursor:pointer; opacity:1;">
-              {{ subiendo ? 'Subiendo...' : (modoReemplazo ? 'Sustituir archivo' : 'Subir archivo') }}
+            <button type="button" (click)="subirEvidencia()" [disabled]="subiendo || !archivoSeleccionado" style="padding:0.5rem 1rem; background:#17a2b8; color:white; border:none; border-radius:4px; cursor:pointer;">
+              {{ subiendo ? 'Subiendo...' : 'Subir archivo' }}
             </button>
             <span *ngIf="archivoSeleccionado" style="color:#495057;">{{ archivoSeleccionado.name }}</span>
           </div>
@@ -143,14 +121,9 @@ import { Evidencia } from '../../../core/models/caso.model';
               </span>
               <p style="margin:0.3rem 0 0 0;">{{ e.descripcion || 'Sin descripción' }}</p>
             </div>
-            <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-              <button type="button" (click)="verEvidencia(e)" style="padding:0.4rem 0.8rem; background:#007bff; color:white; border:none; border-radius:4px; cursor:pointer;">
-                Ver / Descargar
-              </button>
-              <button type="button" (click)="iniciarReemplazo(e)" style="padding:0.4rem 0.8rem; background:#fd7e14; color:white; border:none; border-radius:4px; cursor:pointer;">
-                Cambiar por otro
-              </button>
-            </div>
+            <button type="button" (click)="verEvidencia(e)" style="padding:0.4rem 0.8rem; background:#007bff; color:white; border:none; border-radius:4px; cursor:pointer;">
+              Ver / Descargar
+            </button>
           </li>
         </ul>
       </div>
@@ -188,7 +161,7 @@ import { Evidencia } from '../../../core/models/caso.model';
         <p style="color:#6c757d;">No hay eventos en la bitácora.</p>
       </ng-template>
 
-      <!-- Botón volver -->
+      <!-- Botones volver -->
       <div style="margin-top:1.5rem; display:flex; gap:0.75rem; flex-wrap:wrap;">
         <button (click)="volverAlDetalle()" style="padding:0.5rem 1.5rem; background:#6c757d; color:white; border:none; border-radius:4px; cursor:pointer;">
           ← Volver al detalle
@@ -199,9 +172,7 @@ import { Evidencia } from '../../../core/models/caso.model';
       </div>
     </div>
   `,
-  styles: [`
-    h3 { margin-top: 1.5rem; margin-bottom: 0.8rem; }
-  `]
+  styles: [` h3 { margin-top: 1.5rem; margin-bottom: 0.8rem; } `]
 })
 export class ExpedienteComponent implements OnInit {
   private route = inject(ActivatedRoute);
@@ -212,18 +183,20 @@ export class ExpedienteComponent implements OnInit {
   expediente: ExpedienteResponse | null = null;
   cargando = true;
   error = '';
+  idCaso = 0;
+
+  // Subir evidencia
   archivoSeleccionado: File | null = null;
   descripcion = '';
   subiendo = false;
   mensaje = '';
   errorUpload = false;
-  modoReemplazo = false;
-  evidenciaEnEdicion: Evidencia | null = null;
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
-      this.cargarExpediente(+id);
+      this.idCaso = +id;
+      this.cargarExpediente(this.idCaso);
     } else {
       this.error = 'No se proporcionó un ID de caso válido';
       this.cargando = false;
@@ -250,6 +223,11 @@ export class ExpedienteComponent implements OnInit {
     });
   }
 
+  recargarExpediente() {
+    if (this.idCaso) this.cargarExpediente(this.idCaso);
+  }
+
+  // Evidencias del caso
   onArchivoSeleccionado(event: Event) {
     const input = event.target as HTMLInputElement;
     this.archivoSeleccionado = input.files?.[0] ?? null;
@@ -258,31 +236,24 @@ export class ExpedienteComponent implements OnInit {
   }
 
   subirEvidencia() {
-    const id = this.route.snapshot.paramMap.get('id');
-    if (!this.archivoSeleccionado || !id) {
-      this.mensaje = 'Selecciona un archivo para subir. Se aceptan PDF, imágenes y archivos Excel (.xls/.xlsx).';
+    if (!this.archivoSeleccionado || !this.idCaso) {
+      this.mensaje = 'Selecciona un archivo para subir.';
       this.errorUpload = true;
       return;
     }
-
     this.subiendo = true;
     this.mensaje = '';
     this.errorUpload = false;
-
-    this.evidenciasService.subirCaso(+id, this.archivoSeleccionado, this.descripcion.trim() || undefined).subscribe({
+    this.evidenciasService.subirCaso(this.idCaso, this.archivoSeleccionado, this.descripcion.trim() || undefined).subscribe({
       next: (res) => {
         this.subiendo = false;
         if (res.success) {
           this.mensaje = res.message || 'Evidencia subida correctamente.';
           this.archivoSeleccionado = null;
           this.descripcion = '';
-          this.modoReemplazo = false;
-          this.evidenciaEnEdicion = null;
           const input = document.querySelector('input[type="file"]') as HTMLInputElement | null;
-          if (input) {
-            input.value = '';
-          }
-          this.cargarExpediente(+id);
+          if (input) input.value = '';
+          this.recargarExpediente();
         } else {
           this.errorUpload = true;
           this.mensaje = res.message || 'No se pudo subir la evidencia.';
@@ -291,30 +262,16 @@ export class ExpedienteComponent implements OnInit {
       error: (err) => {
         this.subiendo = false;
         this.errorUpload = true;
-        this.mensaje = err.error?.message || 'Error al subir la evidencia. Verifica el tipo de archivo y que sea un PDF, imagen o Excel válido.';
-      },
+        this.mensaje = err.error?.message || 'Error al subir la evidencia.';
+      }
     });
-  }
-
-  iniciarReemplazo(evidencia: Evidencia) {
-    this.modoReemplazo = true;
-    this.evidenciaEnEdicion = evidencia;
-    this.mensaje = '';
-    this.errorUpload = false;
-  }
-
-  cancelarReemplazo() {
-    this.modoReemplazo = false;
-    this.evidenciaEnEdicion = null;
-    this.mensaje = '';
-    this.errorUpload = false;
   }
 
   verEvidencia(evidencia: Evidencia) {
     this.evidenciasService.descargar(evidencia.id).subscribe({
       next: (blob) => {
         const url = window.URL.createObjectURL(blob);
-        window.open(url, '_blank', 'noopener,noreferrer');
+        window.open(url, '_blank');
         setTimeout(() => window.URL.revokeObjectURL(url), 10000);
       },
       error: () => {
@@ -325,12 +282,8 @@ export class ExpedienteComponent implements OnInit {
   }
 
   volverAlDetalle() {
-    const id = this.route.snapshot.paramMap.get('id');
-    if (id) {
-      this.router.navigate(['/casos', id]);
-    } else {
-      this.router.navigate(['/casos']);
-    }
+    if (this.idCaso) this.router.navigate(['/casos', this.idCaso]);
+    else this.router.navigate(['/casos']);
   }
 
   volverAlListado() {
