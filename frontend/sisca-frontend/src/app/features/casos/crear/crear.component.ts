@@ -152,7 +152,7 @@ import { CasosService } from '../services/casos.service';
             <label style="display:block; font-weight:bold; margin-bottom:0.2rem;">Técnico que reporta *</label>
             <select formControlName="idTecnico" style="width:100%; padding:0.5rem; border:1px solid #ced4da; border-radius:4px;">
               <option value="">Seleccionar técnico</option>
-              <option *ngFor="let m of miembros" [value]="m.usuario.id">{{ m.usuario.nombre }}</option>
+              <option *ngFor="let m of miembros" [value]="getIdTecnico(m)">{{ getNombreTecnico(m) }}</option>
             </select>
             <div *ngIf="casoForm.get('idTecnico')?.invalid && casoForm.get('idTecnico')?.touched" style="color:red; font-size:0.9rem;">Requerido</div>
           </div>
@@ -238,6 +238,7 @@ export class CrearCasoComponent implements OnInit {
     this.cargarCatalogos();
     this.cargarRegiones();
     this.cargarTiposBrigada();
+    this.cargarBrigadas();
   }
 
   // Carga de catálogos
@@ -277,6 +278,17 @@ export class CrearCasoComponent implements OnInit {
     this.catalogosService.getTiposBrigada().subscribe({
       next: (res) => this.tiposBrigada = res.data || [],
       error: (err) => console.error('Error tipos brigada', err)
+    });
+  }
+
+  cargarBrigadas() {
+    this.catalogosService.getBrigadas().subscribe({
+      next: (res) => {
+        this.brigadas = res.data?.brigadas || [];
+        this.miembros = [];
+        this.casoForm.patchValue({ idBrigada: '', idTecnico: '' });
+      },
+      error: (err) => console.error('Error brigadas', err)
     });
   }
 
@@ -336,19 +348,11 @@ export class CrearCasoComponent implements OnInit {
   onTipoBrigadaChange(event: Event) {
     const select = event.target as HTMLSelectElement;
     const tipoId = select.value ? +select.value : null;
+
     if (tipoId) {
-      this.catalogosService.getBrigadas(tipoId).subscribe({
-        next: (res) => {
-          this.brigadas = res.data?.brigadas || [];
-          this.miembros = [];
-          this.casoForm.patchValue({ idBrigada: '', idTecnico: '' });
-        },
-        error: (err) => console.error('Error brigadas', err)
-      });
+      this.cargarBrigadas();
     } else {
-      this.brigadas = [];
-      this.miembros = [];
-      this.casoForm.patchValue({ idBrigada: '', idTecnico: '' });
+      this.cargarBrigadas();
     }
   }
 
@@ -358,15 +362,52 @@ export class CrearCasoComponent implements OnInit {
     if (brigadaId) {
       this.catalogosService.getMiembrosByBrigada(brigadaId).subscribe({
         next: (res) => {
-          this.miembros = res.data?.miembros || [];
+          const miembrosResponse = res.data?.miembros ?? res.data ?? [];
+          const miembrosRaw = Array.isArray(miembrosResponse)
+            ? miembrosResponse
+            : (miembrosResponse?.items ?? []);
+
+          this.miembros = this.normalizarMiembros(miembrosRaw);
           this.casoForm.patchValue({ idTecnico: '' });
         },
-        error: (err) => console.error('Error miembros', err)
+        error: (err) => {
+          console.error('Error miembros', err);
+          this.miembros = [];
+        }
       });
     } else {
       this.miembros = [];
       this.casoForm.patchValue({ idTecnico: '' });
     }
+  }
+
+  private normalizarMiembros(miembros: any[]): any[] {
+    if (!Array.isArray(miembros)) {
+      return [];
+    }
+
+    return miembros
+      .map((miembro) => {
+        const usuario = miembro?.usuario ?? miembro?.usuarioData ?? miembro?.user ?? null;
+        const id = usuario?.id ?? miembro?.idUsuario ?? miembro?.usuarioId ?? miembro?.id ?? null;
+        const nombre = usuario?.nombre ?? usuario?.name ?? miembro?.nombre ?? miembro?.correo ?? 'Sin nombre';
+
+        return {
+          ...miembro,
+          usuario: usuario ? { ...usuario, id, nombre } : { id, nombre },
+          id,
+          nombre,
+        };
+      })
+      .filter((miembro) => miembro.id != null);
+  }
+
+  getIdTecnico(miembro: any): string | number | null {
+    return miembro?.usuario?.id ?? miembro?.id ?? null;
+  }
+
+  getNombreTecnico(miembro: any): string {
+    return miembro?.usuario?.nombre ?? miembro?.nombre ?? miembro?.usuario?.name ?? 'Sin nombre';
   }
 
   onSubmit() {

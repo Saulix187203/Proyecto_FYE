@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { UsuariosService, ActualizarUsuarioRequest, CrearUsuarioRequest } from './usuarios.service';
 import { Rol, Usuario } from '../../core/models/auth.model';
+import { CatalogosService } from '../../core/services/catalogos.service';
 
 @Component({
   selector: 'app-usuarios',
@@ -39,7 +40,8 @@ import { Rol, Usuario } from '../../core/models/auth.model';
               <td style="padding:0.75rem; border-bottom:1px solid #eee;">{{ getRolesTexto(usuario) }}</td>
               <td style="padding:0.75rem; border-bottom:1px solid #eee;">
                 <button type="button" (click)="editarUsuario(usuario)" style="margin-right:0.5rem; padding:0.35rem 0.7rem; background:#007bff; color:white; border:none; border-radius:4px; cursor:pointer;">Editar</button>
-                <button type="button" (click)="desactivarUsuario(usuario.id)" style="padding:0.35rem 0.7rem; background:#dc3545; color:white; border:none; border-radius:4px; cursor:pointer;">Desactivar</button>
+                <button type="button" (click)="desactivarUsuario(usuario.id)" style="margin-right:0.5rem; padding:0.35rem 0.7rem; background:#dc3545; color:white; border:none; border-radius:4px; cursor:pointer;">Desactivar</button>
+                <button type="button" (click)="eliminarUsuario(usuario.id)" style="padding:0.35rem 0.7rem; background:#b02a37; color:white; border:none; border-radius:4px; cursor:pointer;">Eliminar</button>
               </td>
             </tr>
           </tbody>
@@ -69,6 +71,23 @@ import { Rol, Usuario } from '../../core/models/auth.model';
             </select>
           </label>
           <small style="color:#6c757d;">Selecciona un rol para el usuario.</small>
+          <div *ngIf="esRolBrigada()" style="display:grid; gap:0.5rem;">
+            <label>
+              Tipo de brigada
+              <select formControlName="tipoBrigadaId" style="width:100%; padding:0.5rem; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;">
+                <option [ngValue]="null" disabled>Selecciona tipo de brigada</option>
+                <option *ngFor="let t of tiposBrigada" [ngValue]="t.id">{{ t.nombre }}</option>
+              </select>
+            </label>
+            <label>
+              Brigada
+              <select formControlName="codigoBrigada" style="width:100%; padding:0.5rem; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;">
+                <option [ngValue]="null" disabled>Selecciona una brigada</option>
+                <option *ngFor="let brigada of brigadas" [ngValue]="brigada.numero">{{ getBrigadaLabel(brigada) }}</option>
+              </select>
+            </label>
+            <small style="color:#6c757d;">Seleccione la brigada a la que pertenecerá el usuario.</small>
+          </div>
           <label style="display:flex; align-items:center; gap:0.5rem;">
             <input formControlName="activo" type="checkbox">
             Activo
@@ -89,6 +108,8 @@ import { Rol, Usuario } from '../../core/models/auth.model';
 export class UsuariosComponent implements OnInit {
   usuarios: Usuario[] = [];
   roles: Rol[] = [];
+  tiposBrigada: any[] = [];
+  brigadas: any[] = [];
   mensaje = '';
   error = '';
   modoEdicion = false;
@@ -96,6 +117,7 @@ export class UsuariosComponent implements OnInit {
 
   private fb = inject(FormBuilder);
   private usuariosService = inject(UsuariosService);
+  private catalogosService = inject(CatalogosService);
 
   usuarioForm = this.fb.group({
     nombre: ['', Validators.required],
@@ -103,18 +125,82 @@ export class UsuariosComponent implements OnInit {
     password: [''],
     roles: this.fb.control<number | null>(null, Validators.required),
     activo: [true],
+    tipoBrigadaId: [null],
+    codigoBrigada: [''],
   });
 
   ngOnInit(): void {
     this.cargarRoles();
+    this.cargarTiposBrigada();
     this.cargarUsuarios();
+
+    this.usuarioForm.get('roles')?.valueChanges.subscribe(() => {
+      if (!this.esRolBrigada()) {
+        this.brigadas = [];
+        this.usuarioForm.patchValue({ codigoBrigada: null }, { emitEvent: false });
+        return;
+      }
+
+      this.cargarBrigadas(this.usuarioForm.value.tipoBrigadaId as number | null);
+    });
+
+    this.usuarioForm.get('tipoBrigadaId')?.valueChanges.subscribe(() => {
+      if (!this.esRolBrigada()) {
+        return;
+      }
+
+      this.cargarBrigadas(this.usuarioForm.value.tipoBrigadaId as number | null);
+    });
+  }
+
+  cargarTiposBrigada() {
+    this.catalogosService.getTiposBrigada().subscribe({
+      next: (response) => {
+        if (response.success) {
+          this.tiposBrigada = response.data ?? [];
+        }
+      },
+      error: () => {
+        // No bloqueante si falla
+      },
+    });
+  }
+
+  cargarBrigadas(tipoBrigadaId?: number | null) {
+    if (!this.esRolBrigada()) {
+      this.brigadas = [];
+      return;
+    }
+
+    this.catalogosService.getBrigadas(tipoBrigadaId ?? undefined).subscribe({
+      next: (response) => {
+        const data = response.data as any;
+        this.brigadas = data?.brigadas ?? data ?? [];
+      },
+      error: () => {
+        this.brigadas = [];
+      },
+    });
+  }
+
+  getBrigadaLabel(brigada: any): string {
+    const numero = brigada?.numero ? `${brigada.numero}` : '';
+    const nombre = brigada?.nombre ? `${brigada.nombre}` : '';
+    return [numero, nombre].filter(Boolean).join(' - ');
+  }
+
+  esRolBrigada(): boolean {
+    const rolId = this.usuarioForm.value.roles as number | null;
+    if (!rolId) return false;
+    const rol = this.roles.find((r) => r.id === rolId);
+    return !!rol && rol.nombre.toLowerCase().includes('brigad');
   }
 
   cargarUsuarios() {
     this.usuariosService.listarUsuarios().subscribe({
       next: (response) => {
         if (response.success) {
-          this.usuarios = response.data?.usuarios ?? [];
+          this.usuarios = (response.data?.usuarios ?? []).filter((usuario: Usuario) => usuario.activo !== false);
         }
       },
       error: (err) => {
@@ -155,13 +241,20 @@ export class UsuariosComponent implements OnInit {
       password: '',
       roles: usuario.roles?.length ? usuario.roles[0].id : null,
       activo: usuario.activo,
+      tipoBrigadaId: (usuario as any).tipoBrigadaId ?? null,
+      codigoBrigada: (usuario as any).codigoBrigada ?? null,
     });
+
+    if (this.esRolBrigada()) {
+      this.cargarBrigadas(this.usuarioForm.value.tipoBrigadaId as number | null);
+    }
   }
 
   cancelarEdicion() {
     this.modoEdicion = false;
     this.usuarioEditId = null;
     this.usuarioForm.reset({ activo: true, password: '' });
+    this.brigadas = [];
     this.error = '';
     this.mensaje = '';
   }
@@ -175,6 +268,21 @@ export class UsuariosComponent implements OnInit {
     const activo = !!this.usuarioForm.value.activo;
     const rolSeleccionado = this.usuarioForm.value.roles as number | null;
     const roles = rolSeleccionado ? [rolSeleccionado] : [];
+
+    // Validación condicional para usuarios de brigada
+    const tipoBrigadaIdForValidation = this.usuarioForm.value.tipoBrigadaId as number | null;
+    const codigoBrigadaForValidation = this.usuarioForm.value.codigoBrigada?.toString().trim() || '';
+    const seleccionEsBrigada = !!rolSeleccionado && (this.roles.find(r => r.id === rolSeleccionado)?.nombre.toLowerCase().includes('brigad'));
+    if (seleccionEsBrigada) {
+      if (!tipoBrigadaIdForValidation) {
+        this.error = 'Debe seleccionar el tipo de brigada';
+        return;
+      }
+      if (!codigoBrigadaForValidation) {
+        this.error = 'Debe ingresar el código de brigada';
+        return;
+      }
+    }
 
     if (!nombre || !correo) {
       this.error = 'Nombre y correo son obligatorios';
@@ -194,29 +302,63 @@ export class UsuariosComponent implements OnInit {
     this.error = '';
 
     if (this.modoEdicion && this.usuarioEditId !== null) {
-      const payload: ActualizarUsuarioRequest = {
-        nombre,
-        correo,
-        activo,
-        roles,
+      const actualizarBasico = () => {
+        const payload: ActualizarUsuarioRequest = {
+          nombre,
+          correo,
+          activo,
+        };
+
+        this.usuariosService.actualizarUsuario(this.usuarioEditId!, payload).subscribe({
+          next: (response) => {
+            if (response.success) {
+              this.mensaje = 'Usuario actualizado correctamente';
+              this.cancelarEdicion();
+              this.cargarUsuarios();
+            }
+          },
+          error: (err) => {
+            this.error = err.error?.message || 'No se pudo actualizar el usuario';
+          },
+        });
       };
 
-      if (password) {
-        payload.password = password;
-      }
+      const cambiarRoles = () => {
+        this.usuariosService.actualizarRolesUsuario(this.usuarioEditId!, { roles }).subscribe({
+          next: (response) => {
+            if (response.success) {
+              this.mensaje = 'Roles actualizados correctamente';
+              this.cargarUsuarios();
+            }
+          },
+          error: (err) => {
+            this.error = err.error?.message || 'No se pudieron actualizar los roles';
+          },
+        });
+      };
 
-      this.usuariosService.actualizarUsuario(this.usuarioEditId, payload).subscribe({
-        next: (response) => {
-          if (response.success) {
-            this.mensaje = 'Usuario actualizado correctamente';
-            this.cancelarEdicion();
-            this.cargarUsuarios();
-          }
-        },
-        error: (err) => {
-          this.error = err.error?.message || 'No se pudo actualizar el usuario';
-        },
-      });
+      const cambiarPassword = () => {
+        if (!password) return;
+
+        this.usuariosService.actualizarPasswordUsuario(this.usuarioEditId!, { password }).subscribe({
+          next: (response) => {
+            if (response.success) {
+              this.mensaje = 'Contraseña actualizada correctamente';
+              this.cargarUsuarios();
+            }
+          },
+          error: (err) => {
+            this.error = err.error?.message || 'No se pudo actualizar la contraseña';
+          },
+        });
+      };
+
+      actualizarBasico();
+      if (roles.length > 0) {
+        cambiarRoles();
+      }
+      cambiarPassword();
+
       return;
     }
 
@@ -228,12 +370,39 @@ export class UsuariosComponent implements OnInit {
       roles,
     };
 
+    // Añadir campos de brigada si están presentes
+    const tipoBrigadaId = this.usuarioForm.value.tipoBrigadaId as number | null;
+    const codigoBrigada = this.usuarioForm.value.codigoBrigada?.toString().trim() || '';
+    if (tipoBrigadaId) (request as any).tipoBrigadaId = tipoBrigadaId;
+    if (codigoBrigada) (request as any).codigoBrigada = codigoBrigada;
+
     this.usuariosService.crearUsuario(request).subscribe({
       next: (response) => {
         if (response.success) {
-          this.mensaje = 'Usuario creado correctamente';
-          this.usuarioForm.reset({ activo: true, password: '' });
-          this.cargarUsuarios();
+          const usuarioCreado = response.data?.usuario;
+          const brigadaSeleccionada = this.usuarioForm.value.codigoBrigada?.toString().trim() || '';
+          const brigada = this.brigadas.find((item) => item.numero === brigadaSeleccionada || item.id?.toString() === brigadaSeleccionada);
+
+          if (seleccionEsBrigada && usuarioCreado?.id && brigada?.id) {
+            this.usuariosService.agregarMiembroBrigada(brigada.id, { idUsuario: usuarioCreado.id }).subscribe({
+              next: () => {
+                this.mensaje = 'Usuario creado y asignado a la brigada correctamente';
+              },
+              error: () => {
+                this.mensaje = 'Usuario creado, pero no se pudo asignar la brigada';
+              },
+              complete: () => {
+                this.usuarioForm.reset({ activo: true, password: '' });
+                this.brigadas = [];
+                this.cargarUsuarios();
+              },
+            });
+          } else {
+            this.mensaje = 'Usuario creado correctamente';
+            this.usuarioForm.reset({ activo: true, password: '' });
+            this.brigadas = [];
+            this.cargarUsuarios();
+          }
         }
       },
       error: (err) => {
@@ -249,12 +418,33 @@ export class UsuariosComponent implements OnInit {
     this.usuariosService.desactivarUsuario(id).subscribe({
       next: (response) => {
         if (response.success) {
+          this.usuarios = this.usuarios.filter((usuario) => usuario.id !== id);
           this.mensaje = 'Usuario desactivado correctamente';
-          this.cargarUsuarios();
         }
       },
       error: (err) => {
         this.error = err.error?.message || 'No se pudo desactivar el usuario';
+      },
+    });
+  }
+
+  eliminarUsuario(id: number) {
+    if (!window.confirm('¿Seguro que deseas eliminar este usuario?')) {
+      return;
+    }
+
+    this.error = '';
+    this.mensaje = '';
+
+    this.usuariosService.desactivarUsuario(id).subscribe({
+      next: (response) => {
+        if (response.success) {
+          this.usuarios = this.usuarios.filter((usuario) => usuario.id !== id);
+          this.mensaje = 'Usuario eliminado correctamente';
+        }
+      },
+      error: (err) => {
+        this.error = err.error?.message || 'No se pudo eliminar el usuario';
       },
     });
   }

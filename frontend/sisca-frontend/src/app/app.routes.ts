@@ -41,6 +41,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/notificaciones/notificaciones.component').then(m => m.NotificacionesComponent),
   },
   {
+    path: 'perfil',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/perfil/perfil.component').then(m => m.PerfilComponent),
+  },
+  {
     path: 'usuarios',
     canActivate: [authGuard, roleGuard],
     data: { roles: ['Administrador'] },

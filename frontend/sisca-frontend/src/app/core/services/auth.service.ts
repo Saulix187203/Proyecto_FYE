@@ -33,6 +33,10 @@ export class AuthService {
     return data ? JSON.parse(data) : null;
   }
 
+  updateUserData(usuario: Usuario) {
+    localStorage.setItem(this.USER_KEY, JSON.stringify(usuario));
+  }
+
   isAuthenticated(): boolean {
     return !!this.getToken();
   }
