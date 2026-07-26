@@ -60,8 +60,8 @@ import { AccionCorrectiva } from '../../../core/models/caso.model';
           <div>
             <p style="margin:0 0 0.2rem 0;"><strong>{{ accion.descripcion }}</strong></p>
             <p style="margin:0; font-size:0.9rem; color:#6c757d;">
-              <span>Estado: <strong [style.color]="getEstadoColor(accion.estado?.nombre)">{{ accion.estado?.nombre || 'N/A' }}</strong></span>
-              <span style="margin-left:1rem;">Responsable: {{ accion.responsable?.nombre || 'N/A' }}</span>
+              <span>Estado: <strong [style.color]="getEstadoColor(accion.estado.nombre)">{{ accion.estado.nombre || 'N/A' }}</strong></span>
+              <span style="margin-left:1rem;">Responsable: {{ accion.responsable.nombre || 'N/A' }}</span>
               <span style="margin-left:1rem;">Compromiso: {{ accion.fechaCompromiso | date:'dd/MM/yyyy HH:mm' }}</span>
             </p>
           </div>
