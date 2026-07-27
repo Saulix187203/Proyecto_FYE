@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
@@ -30,6 +30,25 @@ export interface ActualizarUsuarioRequest {
 @Injectable({ providedIn: 'root' })
 export class UsuariosService {
   private http = inject(HttpClient);
+
+  getOpciones(texto?: string, limit: number = 20): Observable<ApiResponse<any[]>> {
+    let params = new HttpParams().set('limit', limit.toString());
+    if (texto) params = params.set('texto', texto);
+    return this.http.get<ApiResponse<any[]>>(
+      `${environment.apiUrl}/usuarios/opciones`,
+      { params }
+    );
+  }
+
+  // Si necesitas filtrar por rol (ej. solo responsables)
+  getOpcionesPorRol(rolNombre: string, texto?: string, limit: number = 20): Observable<ApiResponse<any[]>> {
+    let params = new HttpParams().set('limit', limit.toString()).set('rol', rolNombre);
+    if (texto) params = params.set('texto', texto);
+    return this.http.get<ApiResponse<any[]>>(
+      `${environment.apiUrl}/usuarios/opciones`,
+      { params }
+    );
+  }
 
   listarUsuarios(): Observable<ApiResponse<{ usuarios: Usuario[] }>> {
     return this.http.get<ApiResponse<{ usuarios: Usuario[] }>>(`${environment.apiUrl}/usuarios`);

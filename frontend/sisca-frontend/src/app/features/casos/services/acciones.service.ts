@@ -16,8 +16,8 @@ export class AccionesService {
     );
   }
 
-  listarPorCaso(idCaso: number): Observable<ApiResponse<AccionCorrectiva[]>> {
-    return this.http.get<ApiResponse<AccionCorrectiva[]>>(
+  listarPorCaso(idCaso: number): Observable<ApiResponse<{ acciones: AccionCorrectiva[] }>> {
+    return this.http.get<ApiResponse<{ acciones: AccionCorrectiva[] }>>(
       `${environment.apiUrl}/acciones-correctivas/caso/${idCaso}`
     );
   }

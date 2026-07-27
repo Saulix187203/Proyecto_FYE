@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators, FormsModule } from '@angular/forms';
 import { AccionesService } from '../services/acciones.service';
 import { EvidenciasService } from '../services/evidencias.service';
-import { UsuariosService } from '../services/usuarios.service';
+import { UsuariosService } from '../services/usuarios.service';  // ✅ Importación CORRECTA
 import { AuthService } from '../../../core/services/auth.service';
 import { AccionCorrectiva } from '../../../core/models/caso.model';
 
@@ -60,8 +60,8 @@ import { AccionCorrectiva } from '../../../core/models/caso.model';
           <div>
             <p style="margin:0 0 0.2rem 0;"><strong>{{ accion.descripcion }}</strong></p>
             <p style="margin:0; font-size:0.9rem; color:#6c757d;">
-              <span>Estado: <strong [style.color]="getEstadoColor(accion.estado.nombre)">{{ accion.estado.nombre || 'N/A' }}</strong></span>
-              <span style="margin-left:1rem;">Responsable: {{ accion.responsable.nombre || 'N/A' }}</span>
+              <span>Estado: <strong [style.color]="getEstadoColor(accion.estado?.nombre)">{{ accion.estado?.nombre || 'N/A' }}</strong></span>
+              <span style="margin-left:1rem;">Responsable: {{ accion.responsable?.nombre || 'N/A' }}</span>
               <span style="margin-left:1rem;">Compromiso: {{ accion.fechaCompromiso | date:'dd/MM/yyyy HH:mm' }}</span>
             </p>
           </div>
@@ -245,19 +245,27 @@ export class AccionesCasoComponent implements OnInit {
   cargarAcciones() {
     if (!this.idCaso) return;
     this.accionesService.listarPorCaso(this.idCaso).subscribe({
-      next: (res) => this.acciones = res.data || [],
+      next: (res) => {
+        // ✅ res.data.acciones es el array
+        this.acciones = res.data?.acciones || [];
+        console.log('Acciones cargadas:', this.acciones);
+      },
       error: (err) => console.error('Error cargando acciones', err)
     });
   }
 
   cargarUsuarios() {
-    // Cargar usuarios con roles de responsable (puedes ajustar el rol)
     this.usuariosService.getOpcionesPorRol('Responsable del Proceso').subscribe({
-      next: (res) => this.usuarios = res.data || [],
+      next: (data) => {
+        this.usuarios = data || [];
+        console.log('Usuarios cargados:', this.usuarios);
+      },
       error: () => {
-        // Si falla, cargar todos los usuarios (fallback)
         this.usuariosService.getOpciones().subscribe({
-          next: (res) => this.usuarios = res.data || []
+          next: (data) => {
+            this.usuarios = data || [];
+            console.log('Usuarios cargados (fallback):', this.usuarios);
+          }
         });
       }
     });

@@ -9,7 +9,7 @@ import { NotificacionesService } from './notificaciones.service';
   imports: [CommonModule],
   template: `
     <h2>Notificaciones</h2>
-    <button (click)="marcarTodas()">Marcar todas como leídas</button>
+    <button (click)="marcarTodas()" style="margin-bottom:1rem;">Marcar todas como leídas</button>
     <ul>
       <li *ngFor="let n of notificaciones" [style.font-weight]="n.leida ? 'normal' : 'bold'">
         {{ n.titulo }} - {{ n.mensaje }} ({{ n.fecha | date:'short' }})
@@ -29,22 +29,25 @@ export class NotificacionesComponent implements OnInit {
 
   cargar() {
     this.notificacionesService.listar().subscribe({
-      next: (res: any) => this.notificaciones = res.data,
-      error: (err) => console.error(err)
+      next: (data) => {
+        this.notificaciones = data;
+        console.log('Notificaciones cargadas:', this.notificaciones);
+      },
+      error: (err) => console.error('Error cargando notificaciones', err)
     });
   }
 
   marcarLeida(id: number) {
     this.notificacionesService.marcarLeida(id).subscribe({
       next: () => this.cargar(),
-      error: (err) => console.error(err)
+      error: (err) => console.error('Error marcando leída', err)
     });
   }
 
   marcarTodas() {
     this.notificacionesService.marcarTodasLeidas().subscribe({
       next: () => this.cargar(),
-      error: (err) => console.error(err)
+      error: (err) => console.error('Error marcando todas', err)
     });
   }
 }
