@@ -40,6 +40,7 @@ import { CatalogosService } from '../../core/services/catalogos.service';
               <td style="padding:0.75rem; border-bottom:1px solid #eee;">{{ getRolesTexto(usuario) }}</td>
               <td style="padding:0.75rem; border-bottom:1px solid #eee;">
                 <button type="button" (click)="editarUsuario(usuario)" style="margin-right:0.5rem; padding:0.35rem 0.7rem; background:#007bff; color:white; border:none; border-radius:4px; cursor:pointer;">Editar</button>
+                <button type="button" (click)="abrirModalRoles(usuario)" style="margin-right:0.5rem; padding:0.35rem 0.7rem; background:#6f42c1; color:white; border:none; border-radius:4px; cursor:pointer;">Roles</button>
                 <button type="button" (click)="desactivarUsuario(usuario.id)" style="margin-right:0.5rem; padding:0.35rem 0.7rem; background:#dc3545; color:white; border:none; border-radius:4px; cursor:pointer;">Desactivar</button>
                 <button type="button" (click)="eliminarUsuario(usuario.id)" style="padding:0.35rem 0.7rem; background:#b02a37; color:white; border:none; border-radius:4px; cursor:pointer;">Eliminar</button>
               </td>
@@ -102,6 +103,31 @@ import { CatalogosService } from '../../core/services/catalogos.service';
           </div>
         </form>
       </article>
+
+      <div *ngIf="mostrarModalRoles" style="position:fixed; inset:0; background:rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; z-index:1000; padding:1rem;">
+        <div style="width:min(100%, 480px); background:#fff; border-radius:8px; padding:1.25rem; box-shadow:0 10px 30px rgba(0,0,0,0.2);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+            <h3 style="margin:0;">Asignar roles</h3>
+            <button type="button" (click)="cerrarModalRoles()" style="border:none; background:transparent; font-size:1.2rem; cursor:pointer;">✕</button>
+          </div>
+
+          <p *ngIf="usuarioSeleccionadoParaRoles" style="margin:0 0 1rem; color:#495057;">
+            {{ usuarioSeleccionadoParaRoles.nombre }} ({{ usuarioSeleccionadoParaRoles.correo }})
+          </p>
+
+          <div style="display:grid; gap:0.6rem; max-height:280px; overflow:auto; padding-right:0.25rem;">
+            <label *ngFor="let rol of roles" style="display:flex; align-items:center; gap:0.6rem; padding:0.5rem 0.6rem; border:1px solid #dee2e6; border-radius:6px; cursor:pointer;">
+              <input type="checkbox" [checked]="estaSeleccionado(rol.id)" (change)="toggleRol(rol.id)">
+              <span>{{ rol.nombre }}</span>
+            </label>
+          </div>
+
+          <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:1rem;">
+            <button type="button" (click)="cerrarModalRoles()" style="padding:0.6rem 1rem; background:#6c757d; color:#fff; border:none; border-radius:4px; cursor:pointer;">Cancelar</button>
+            <button type="button" (click)="guardarRolesUsuario()" style="padding:0.6rem 1rem; background:#28a745; color:#fff; border:none; border-radius:4px; cursor:pointer;">Guardar roles</button>
+          </div>
+        </div>
+      </div>
     </section>
   `
 })
@@ -114,6 +140,9 @@ export class UsuariosComponent implements OnInit {
   error = '';
   modoEdicion = false;
   usuarioEditId: number | null = null;
+  mostrarModalRoles = false;
+  usuarioSeleccionadoParaRoles: Usuario | null = null;
+  rolesSeleccionados: number[] = [];
 
   private fb = inject(FormBuilder);
   private usuariosService = inject(UsuariosService);
@@ -228,6 +257,53 @@ export class UsuariosComponent implements OnInit {
 
   getRolesTexto(usuario: Usuario): string {
     return (usuario.roles ?? []).map((rol) => rol.nombre).join(', ');
+  }
+
+  abrirModalRoles(usuario: Usuario) {
+    this.usuarioSeleccionadoParaRoles = usuario;
+    this.rolesSeleccionados = (usuario.roles ?? []).map((rol) => rol.id);
+    this.mostrarModalRoles = true;
+    this.error = '';
+    this.mensaje = '';
+  }
+
+  cerrarModalRoles() {
+    this.mostrarModalRoles = false;
+    this.usuarioSeleccionadoParaRoles = null;
+    this.rolesSeleccionados = [];
+  }
+
+  estaSeleccionado(rolId: number): boolean {
+    return this.rolesSeleccionados.includes(rolId);
+  }
+
+  toggleRol(rolId: number) {
+    const existe = this.rolesSeleccionados.includes(rolId);
+    if (existe) {
+      this.rolesSeleccionados = this.rolesSeleccionados.filter((id) => id !== rolId);
+      return;
+    }
+
+    this.rolesSeleccionados = [...this.rolesSeleccionados, rolId];
+  }
+
+  guardarRolesUsuario() {
+    if (!this.usuarioSeleccionadoParaRoles) {
+      return;
+    }
+
+    this.usuariosService.actualizarRolesUsuario(this.usuarioSeleccionadoParaRoles.id, { roles: this.rolesSeleccionados }).subscribe({
+      next: (response) => {
+        if (response.success) {
+          this.mensaje = 'Roles actualizados correctamente';
+          this.cerrarModalRoles();
+          this.cargarUsuarios();
+        }
+      },
+      error: (err) => {
+        this.error = err.error?.message || 'No se pudieron actualizar los roles';
+      },
+    });
   }
 
   editarUsuario(usuario: Usuario) {
