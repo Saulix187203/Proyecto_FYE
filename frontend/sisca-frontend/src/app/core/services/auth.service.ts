@@ -24,6 +24,16 @@ export class AuthService {
     );
   }
 
+  getMe(): Observable<ApiResponse<{ usuario: Usuario }>> {
+    return this.http.get<ApiResponse<{ usuario: Usuario }>>(`${environment.apiUrl}/auth/me`).pipe(
+      tap(response => {
+        if (response.success && response.data?.usuario) {
+          this.updateUserData(response.data.usuario);
+        }
+      })
+    );
+  }
+
   getToken(): string | null {
     return localStorage.getItem(this.TOKEN_KEY);
   }

@@ -90,7 +90,7 @@ export class PerfilComponent implements OnInit {
     this.cargando = true;
     this.error = '';
 
-    this.usuariosService.getUsuarioById(usuarioLogueado.id).subscribe({
+    this.authService.getMe().subscribe({
       next: (response) => {
         this.cargando = false;
         if (response.success) {
