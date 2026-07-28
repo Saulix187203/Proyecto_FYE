@@ -1,6 +1,16 @@
 import { Area, Proceso, TipoEvento, Criticidad, EstadoCaso, EstadoAccion } from './catalogo.model';
 import { Usuario } from './auth.model';
 
+export interface BrigadaReportante {
+  id: number;
+  numero: string;
+  nombre: string;
+  region?: { id: number; nombre: string; codigo?: string };
+  departamento?: { id: number; nombre: string; codigo?: string };
+  municipio?: { id: number; nombre: string; codigo?: string };
+  tipoBrigada?: { id: number; nombre: string; descripcion?: string };
+}
+
 export interface Caso {
   id: number;
   correlativo: string;
@@ -8,7 +18,7 @@ export interface Caso {
   descripcion: string;
   lugar: string;
   fechaEvento: string;
-  fechaCreacion: string;
+  fechaCreacion: string;  // Puede ser createdAt o fechaReporte, lo manejamos con alias
   area: Area | null;
   proceso: Proceso | null;
   tipoEvento: TipoEvento | null;
@@ -16,15 +26,19 @@ export interface Caso {
   estado: EstadoCaso | null;
   creadoPor: Usuario | null;
 
-  // NUEVOS CAMPOS (según retroalimentación)
-  region?: any;                // objeto región (id, nombre)
-  departamento?: any;          // objeto departamento
-  municipio?: any;             // objeto municipio
-  tipoBrigada?: any;           // objeto tipo de brigada
-  nombreTecnico?: string;
+  // Campos adicionales devueltos por el backend
+  usuarioReporta?: Usuario | null;      // En lugar de creadoPor (o ambos)
+  fechaReporte?: string;               // Fecha de creación (alternativa)
+  createdAt?: string;                  // Fecha de creación (alternativa)
+  updatedAt?: string;
+  brigadaReportante?: any;             // Objeto con { id, numero, nombre, region?, departamento?, municipio?, tipoBrigada? }
+  region?: any;                        // { id, nombre, codigo }
+  departamento?: any;                  // { id, nombre, codigo }
+  municipio?: any;                     // { id, nombre, codigo }
+  tipoBrigada?: any;                   // { id, nombre, descripcion }
   codigoBrigada?: string;
+  nombreTecnico?: string;
 }
-
 export interface ReporteInicial {
   id: number;
   descripcionDetallada: string;

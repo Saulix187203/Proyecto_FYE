@@ -59,14 +59,22 @@ import { ValidacionProcedenciaComponent } from '../validacion/validacion-procede
           </p>
           <p><strong>Fecha Evento:</strong> {{ caso.fechaEvento | date:'dd/MM/yyyy HH:mm' }}</p>
           <p><strong>Lugar:</strong> {{ caso.lugar }}</p>
-          <p><strong>Creado por:</strong> {{ caso.creadoPor?.nombre || 'N/A' }}</p>
-          <p><strong>Fecha Creación:</strong> {{ caso.fechaCreacion | date:'dd/MM/yyyy HH:mm' }}</p>
-          <p><strong>Región:</strong> {{ caso.region?.nombre || 'N/A' }}</p>
-          <p><strong>Departamento:</strong> {{ caso.departamento?.nombre || 'N/A' }}</p>
-          <p><strong>Municipio:</strong> {{ caso.municipio?.nombre || 'N/A' }}</p>
-          <p><strong>Tipo Brigada:</strong> {{ caso.tipoBrigada?.nombre || 'N/A' }}</p>
-          <p><strong>Técnico:</strong> {{ caso.nombreTecnico || 'N/A' }}</p>
-          <p><strong>Código Brigada:</strong> {{ caso.codigoBrigada || 'N/A' }}</p>
+          <p><strong>Creado por:</strong> {{ (caso.usuarioReporta || caso.creadoPor)?.nombre || 'N/A' }}</p>
+          <p><strong>Fecha Creación:</strong> {{ (caso.fechaReporte || caso.createdAt || caso.fechaCreacion) | date:'dd/MM/yyyy HH:mm' }}</p>
+        </div>
+      </div>
+
+      <!-- Datos de brigada y ubicación -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; background:#f8f9fa; padding:1rem; border-radius:4px; margin-top:1rem;">
+        <div>
+          <p><strong>Región:</strong> {{ caso.brigadaReportante?.region?.nombre || 'N/A' }}</p>
+          <p><strong>Departamento:</strong> {{ caso.brigadaReportante?.departamento?.nombre || 'N/A' }}</p>
+          <p><strong>Municipio:</strong> {{ caso.brigadaReportante?.municipio?.nombre || 'N/A' }}</p>
+        </div>
+        <div>
+          <p><strong>Tipo Brigada:</strong> {{ caso.brigadaReportante?.tipoBrigada?.nombre || 'N/A' }}</p>
+          <p><strong>Brigada:</strong> {{ caso.brigadaReportante?.nombre || 'N/A' }}</p>
+          <p><strong>Código Brigada:</strong> {{ caso.brigadaReportante?.numero || caso.codigoBrigada || 'N/A' }}</p>
         </div>
       </div>
 
@@ -107,24 +115,20 @@ import { ValidacionProcedenciaComponent } from '../validacion/validacion-procede
 
       <!-- Acciones: Botones de validación, expediente, cierre, volver -->
       <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1rem;">
-
-        <!-- Botón de validación (solo para Admin, PRL, SYMA) -->
         <button *ngIf="mostrarBotonValidacion()" 
                 (click)="abrirValidacion()" 
                 style="padding:0.5rem 1rem; background:#6f42c1; color:white; border:none; border-radius:4px; cursor:pointer;">
           🔍 Validar procedencia
         </button>
-
         <a [routerLink]="['/casos', caso.id, 'expediente']" style="display:inline-block; padding:0.5rem 1rem; background:#007bff; color:white; text-decoration:none; border-radius:4px;">
           📄 Ver Expediente Completo
         </a>
-
         <button (click)="volver()" style="padding:0.5rem 1rem; background:#6c757d; color:white; border:none; border-radius:4px; cursor:pointer;">
           ← Volver al listado
         </button>
       </div>
 
-      <!-- Botones de cierre (solo para estados específicos) -->
+      <!-- Botones de cierre -->
       <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1rem;">
         <button *ngIf="mostrarCerrarSinAcciones()" 
                 (click)="abrirModalCerrarSinAcciones()" 
@@ -144,7 +148,7 @@ import { ValidacionProcedenciaComponent } from '../validacion/validacion-procede
       </div>
     </div>
 
-    <!-- Modal de validación de procedencia (corregido: && caso) -->
+    <!-- Modal de validación de procedencia -->
     <app-validacion-procedencia *ngIf="mostrarValidacion && caso"
       [idCaso]="caso.id"
       [caso]="caso"

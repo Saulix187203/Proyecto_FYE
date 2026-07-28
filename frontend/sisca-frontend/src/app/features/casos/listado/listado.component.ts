@@ -28,61 +28,41 @@ import { Caso } from '../../../core/models/caso.model';
 
     <!-- Filtros -->
     <form [formGroup]="filtroForm" (ngSubmit)="aplicarFiltros()" style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1rem; padding:1rem; background:#f8f9fa; border-radius:4px; align-items:center;">
-      <!-- Búsqueda por texto -->
       <input formControlName="texto" placeholder="Buscar..." style="padding:0.3rem; flex:1; min-width:150px; border:1px solid #ced4da; border-radius:4px;">
-
-      <!-- Estado -->
       <select formControlName="estado" style="padding:0.3rem; border:1px solid #ced4da; border-radius:4px; min-width:120px;">
         <option value="">Todos los estados</option>
         <option *ngFor="let e of estados" [value]="e.id">{{ e.nombre }}</option>
       </select>
-
-      <!-- Área -->
       <select formControlName="area" style="padding:0.3rem; border:1px solid #ced4da; border-radius:4px; min-width:120px;">
         <option value="">Todas las áreas</option>
         <option *ngFor="let a of areas" [value]="a.id">{{ a.nombre }}</option>
       </select>
-
-      <!-- Criticidad -->
       <select formControlName="criticidad" style="padding:0.3rem; border:1px solid #ced4da; border-radius:4px; min-width:120px;">
         <option value="">Todas las criticidades</option>
         <option *ngFor="let c of criticidades" [value]="c.id">{{ c.nombre }}</option>
       </select>
-
-      <!-- Región (cascada) -->
       <select formControlName="region" (change)="onRegionChange($event)" style="padding:0.3rem; border:1px solid #ced4da; border-radius:4px; min-width:120px;">
         <option value="">Todas las regiones</option>
         <option *ngFor="let r of regiones" [value]="r.id">{{ r.nombre }}</option>
       </select>
-
-      <!-- Departamento (cascada) -->
       <select formControlName="departamento" (change)="onDepartamentoChange($event)" style="padding:0.3rem; border:1px solid #ced4da; border-radius:4px; min-width:120px;">
         <option value="">Todos los departamentos</option>
         <option *ngFor="let d of departamentos" [value]="d.id">{{ d.nombre }}</option>
       </select>
-
-      <!-- Municipio (cascada) -->
       <select formControlName="municipio" style="padding:0.3rem; border:1px solid #ced4da; border-radius:4px; min-width:120px;">
         <option value="">Todos los municipios</option>
         <option *ngFor="let m of municipios" [value]="m.id">{{ m.nombre }}</option>
       </select>
-
-      <!-- Técnico que reporta (usuario) -->
       <select formControlName="tecnico" style="padding:0.3rem; border:1px solid #ced4da; border-radius:4px; min-width:120px;">
         <option value="">Todos los técnicos</option>
         <option *ngFor="let u of tecnicos" [value]="u.id">{{ u.nombre }}</option>
       </select>
-
-      <!-- Fechas -->
       <input formControlName="fechaDesde" type="datetime-local" placeholder="Desde" style="padding:0.3rem; border:1px solid #ced4da; border-radius:4px;">
       <input formControlName="fechaHasta" type="datetime-local" placeholder="Hasta" style="padding:0.3rem; border:1px solid #ced4da; border-radius:4px;">
-
-      <!-- Botones -->
       <button type="submit" style="padding:0.3rem 1rem; background:#007bff; color:white; border:none; border-radius:4px; cursor:pointer;">Filtrar</button>
       <button type="button" (click)="limpiarFiltros()" style="padding:0.3rem 1rem; background:#6c757d; color:white; border:none; border-radius:4px; cursor:pointer;">Limpiar</button>
     </form>
 
-    <!-- Mensaje de acceso denegado (por si viene de redirección) -->
     <div *ngIf="accessDeniedMessage" style="background:#fff3cd; padding:0.75rem; border-radius:4px; margin-bottom:1rem; color:#856404; border-left:4px solid #ffeeba;">
       {{ accessDeniedMessage }}
     </div>
@@ -116,9 +96,10 @@ import { Caso } from '../../../core/models/caso.model';
           <thead>
             <tr style="background:#f8f9fa;">
               <th style="border:1px solid #ddd; padding:0.5rem; text-align:left;">Correlativo</th>
-              <th style="border:1px solid #ddd; padding:0.5rem; text-align:left;">Título</th>
               <th style="border:1px solid #ddd; padding:0.5rem; text-align:left;">Área</th>
               <th style="border:1px solid #ddd; padding:0.5rem; text-align:left;">Estado</th>
+              <th style="border:1px solid #ddd; padding:0.5rem; text-align:left;">Municipio</th>
+              <th style="border:1px solid #ddd; padding:0.5rem; text-align:left;">Técnico</th>
               <th style="border:1px solid #ddd; padding:0.5rem; text-align:left;">Fecha</th>
               <th style="border:1px solid #ddd; padding:0.5rem; text-align:left;">Acciones</th>
             </tr>
@@ -126,12 +107,17 @@ import { Caso } from '../../../core/models/caso.model';
           <tbody>
             <tr *ngFor="let caso of casos">
               <td style="border:1px solid #ddd; padding:0.5rem;">{{ caso.correlativo }}</td>
-              <td style="border:1px solid #ddd; padding:0.5rem;">{{ caso.titulo }}</td>
               <td style="border:1px solid #ddd; padding:0.5rem;">{{ caso.area?.nombre || 'N/A' }}</td>
               <td style="border:1px solid #ddd; padding:0.5rem;">
                 <span [style.color]="getEstadoColor(caso.estado?.nombre)" style="font-weight:bold;">
                   {{ caso.estado?.nombre || 'N/A' }}
                 </span>
+              </td>
+              <td style="border:1px solid #ddd; padding:0.5rem;">
+                {{ caso.brigadaReportante?.municipio?.nombre || 'N/A' }}
+              </td>
+              <td style="border:1px solid #ddd; padding:0.5rem;">
+                {{ (caso.usuarioReporta || caso.creadoPor)?.nombre || 'N/A' }}
               </td>
               <td style="border:1px solid #ddd; padding:0.5rem;">{{ caso.fechaEvento | date:'dd/MM/yyyy HH:mm' }}</td>
               <td style="border:1px solid #ddd; padding:0.5rem;">
@@ -167,16 +153,14 @@ export class ListadoCasosComponent implements OnInit {
   cargando = true;
   error = '';
 
-  // Catálogos para filtros
   areas: any[] = [];
   estados: any[] = [];
   criticidades: any[] = [];
   regiones: any[] = [];
   departamentos: any[] = [];
   municipios: any[] = [];
-  tecnicos: any[] = [];   // Usuarios para filtro de técnico reportante
+  tecnicos: any[] = [];
 
-  // Variables para filtro automático por brigada
   filtroBrigadaActivo = false;
   nombreBrigada = '';
 
@@ -223,7 +207,6 @@ export class ListadoCasosComponent implements OnInit {
       next: (res) => { this.regiones = res.data || []; },
       error: () => { /* silencio */ }
     });
-    // Cargar técnicos (usuarios con opciones)
     this.usuariosService.getOpciones().subscribe({
       next: (data) => { this.tecnicos = data || []; },
       error: () => { /* silencio */ }
@@ -231,10 +214,9 @@ export class ListadoCasosComponent implements OnInit {
   }
 
   private cargarDependencias(): void {
-    // Si no hay regiones, no se cargan departamentos/municipios
+    // Se cargan departamentos y municipios según la región seleccionada en el filtro
   }
 
-  // Cascada geográfica en filtros
   onRegionChange(event: Event): void {
     const select = event.target as HTMLSelectElement;
     const regionId = select.value ? +select.value : null;
@@ -243,7 +225,10 @@ export class ListadoCasosComponent implements OnInit {
     this.filtroForm.patchValue({ departamento: '', municipio: '' });
     if (regionId) {
       this.catalogosService.getDepartamentos(regionId).subscribe({
-        next: (res) => { this.departamentos = res.data || []; },
+        next: (res) => {
+          const deptos = (res.data as any)?.departamentos || res.data || [];
+          this.departamentos = deptos;
+        },
         error: () => { /* silencio */ }
       });
     }
@@ -256,13 +241,15 @@ export class ListadoCasosComponent implements OnInit {
     this.filtroForm.patchValue({ municipio: '' });
     if (deptoId) {
       this.catalogosService.getMunicipios(deptoId).subscribe({
-        next: (res) => { this.municipios = res.data || []; },
+        next: (res) => {
+          const munis = (res.data as any)?.municipios || res.data || [];
+          this.municipios = munis;
+        },
         error: () => { /* silencio */ }
       });
     }
   }
 
-  // Determinar si el usuario puede crear casos (según rol)
   puedeCrearCaso(): boolean {
     const rolesPermitidos = ['Administrador', 'Brigada', 'PRL Contratista', 'SYMA'];
     const usuario = this.authService.getUsuario();
@@ -284,11 +271,10 @@ export class ListadoCasosComponent implements OnInit {
     if (formVal.region) filtros.region = formVal.region;
     if (formVal.departamento) filtros.departamento = formVal.departamento;
     if (formVal.municipio) filtros.municipio = formVal.municipio;
-    if (formVal.tecnico) filtros.tecnico = formVal.tecnico; // El backend debe soportar este filtro
+    if (formVal.tecnico) filtros.tecnico = formVal.tecnico;
     if (formVal.fechaDesde) filtros.fechaDesde = formVal.fechaDesde;
     if (formVal.fechaHasta) filtros.fechaHasta = formVal.fechaHasta;
 
-    // Verificar si el usuario es Brigada y aplicar filtro automático
     const usuario = this.authService.getUsuario();
     const esBrigada = usuario?.roles?.some(r => r.nombre === 'Brigada') || false;
     if (esBrigada) {
@@ -306,7 +292,6 @@ export class ListadoCasosComponent implements OnInit {
           this.ejecutarBusqueda(filtros);
         },
         error: () => {
-          // Si falla, intentar sin filtro de brigada
           this.filtroBrigadaActivo = false;
           this.nombreBrigada = '';
           this.ejecutarBusqueda(filtros);

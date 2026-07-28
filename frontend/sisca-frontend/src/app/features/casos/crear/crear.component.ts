@@ -4,6 +4,8 @@ import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { CatalogosService } from '../../../core/services/catalogos.service';
 import { CasosService } from '../services/casos.service';
+import { AuthService } from '../../../core/services/auth.service';
+import { BrigadasService, Brigada } from '../../../core/services/brigadas.service';
 
 @Component({
   selector: 'app-crear-caso',
@@ -24,7 +26,6 @@ import { CasosService } from '../services/casos.service';
         <h4 style="margin:0 0 0.8rem 0; color:#495057;">📌 Datos del evento</h4>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
 
-          <!-- Área con filtro de procesos -->
           <div>
             <label style="display:block; font-weight:bold; margin-bottom:0.2rem;">Área *</label>
             <select formControlName="idArea" (change)="onAreaChange($event)" style="width:100%; padding:0.5rem; border:1px solid #ced4da; border-radius:4px;">
@@ -34,7 +35,6 @@ import { CasosService } from '../services/casos.service';
             <div *ngIf="casoForm.get('idArea')?.invalid && casoForm.get('idArea')?.touched" style="color:red; font-size:0.9rem;">Requerido</div>
           </div>
 
-          <!-- Proceso filtrado -->
           <div>
             <label style="display:block; font-weight:bold; margin-bottom:0.2rem;">Proceso *</label>
             <select formControlName="idProceso" style="width:100%; padding:0.5rem; border:1px solid #ced4da; border-radius:4px;">
@@ -89,45 +89,18 @@ import { CasosService } from '../services/casos.service';
         </div>
       </div>
 
-      <!-- SECCIÓN 2: Ubicación geográfica -->
-      <div style="background:#e9f7fe; padding:1.2rem; border-radius:8px; margin-bottom:1.5rem; border:1px solid #b8daff;">
-        <h4 style="margin:0 0 0.8rem 0; color:#0056b3;">🌍 Ubicación geográfica</h4>
-        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem;">
-
-          <div>
-            <label style="display:block; font-weight:bold; margin-bottom:0.2rem;">Región *</label>
-            <select formControlName="idRegion" (change)="onRegionChange($event)" style="width:100%; padding:0.5rem; border:1px solid #ced4da; border-radius:4px;">
-              <option value="">Seleccionar región</option>
-              <option *ngFor="let r of regiones" [value]="r.id">{{ r.nombre }}</option>
-            </select>
-            <div *ngIf="casoForm.get('idRegion')?.invalid && casoForm.get('idRegion')?.touched" style="color:red; font-size:0.9rem;">Requerido</div>
-          </div>
-
-          <div>
-            <label style="display:block; font-weight:bold; margin-bottom:0.2rem;">Departamento</label>
-            <select formControlName="idDepartamento" (change)="onDepartamentoChange($event)" style="width:100%; padding:0.5rem; border:1px solid #ced4da; border-radius:4px;">
-              <option value="">Seleccionar departamento</option>
-              <option *ngFor="let d of departamentos" [value]="d.id">{{ d.nombre }}</option>
-            </select>
-          </div>
-
-          <div>
-            <label style="display:block; font-weight:bold; margin-bottom:0.2rem;">Municipio</label>
-            <select formControlName="idMunicipio" style="width:100%; padding:0.5rem; border:1px solid #ced4da; border-radius:4px;">
-              <option value="">Seleccionar municipio</option>
-              <option *ngFor="let m of municipios" [value]="m.id">{{ m.nombre }}</option>
-            </select>
-          </div>
-
-        </div>
-      </div>
-
-      <!-- SECCIÓN 3: Datos del técnico y brigada -->
+      <!-- SECCIÓN 2: Datos del técnico y brigada -->
       <div style="background:#f0f8f0; padding:1.2rem; border-radius:8px; margin-bottom:1.5rem; border:1px solid #b7e0b7;">
         <h4 style="margin:0 0 0.8rem 0; color:#155724;">👷 Datos del técnico / brigada</h4>
+
+        <!-- Mensaje de autocompletado para Brigada (solo si es BRIGADA PURO) -->
+        <div *ngIf="esUsuarioBrigada && !tieneOtrosRoles" style="background:#d4edda; padding:0.5rem 1rem; border-radius:4px; margin-bottom:0.8rem; color:#155724; border-left:4px solid #28a745;">
+          ✅ Tus datos de brigada y técnico han sido asignados automáticamente.
+        </div>
+
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
 
-          <!-- Tipo de Brigada -->
+          <!-- Tipo de Brigada (filtro) -->
           <div>
             <label style="display:block; font-weight:bold; margin-bottom:0.2rem;">Tipo de Brigada *</label>
             <select formControlName="idTipoBrigada" (change)="onTipoBrigadaChange($event)" style="width:100%; padding:0.5rem; border:1px solid #ced4da; border-radius:4px;">
@@ -137,26 +110,30 @@ import { CasosService } from '../services/casos.service';
             <div *ngIf="casoForm.get('idTipoBrigada')?.invalid && casoForm.get('idTipoBrigada')?.touched" style="color:red; font-size:0.9rem;">Requerido</div>
           </div>
 
-          <!-- Brigada -->
+          <!-- Brigada (código) -->
           <div>
             <label style="display:block; font-weight:bold; margin-bottom:0.2rem;">Código de Brigada *</label>
-            <select formControlName="idBrigada" (change)="onBrigadaChange($event)" style="width:100%; padding:0.5rem; border:1px solid #ced4da; border-radius:4px;">
+            <select formControlName="idBrigada" [disabled]="brigadaBloqueada" (change)="onBrigadaChange($event)" style="width:100%; padding:0.5rem; border:1px solid #ced4da; border-radius:4px;">
               <option value="">Seleccionar brigada</option>
               <option *ngFor="let b of brigadas" [value]="b.id">{{ b.numero }} - {{ b.nombre }}</option>
             </select>
             <div *ngIf="casoForm.get('idBrigada')?.invalid && casoForm.get('idBrigada')?.touched" style="color:red; font-size:0.9rem;">Requerido</div>
           </div>
 
-          <!-- Técnico -->
+          <!-- Técnico (nombre) -->
           <div style="grid-column: span 2;">
             <label style="display:block; font-weight:bold; margin-bottom:0.2rem;">Técnico que reporta *</label>
-            <select formControlName="idTecnico" style="width:100%; padding:0.5rem; border:1px solid #ced4da; border-radius:4px;">
+            <select formControlName="idTecnico" [disabled]="tecnicoBloqueado" style="width:100%; padding:0.5rem; border:1px solid #ced4da; border-radius:4px;">
               <option value="">Seleccionar técnico</option>
-              <option *ngFor="let m of miembros" [value]="getIdTecnico(m)">{{ getNombreTecnico(m) }}</option>
+              <option *ngFor="let m of miembros" [value]="m.usuario.id">{{ m.usuario.nombre }}</option>
             </select>
             <div *ngIf="casoForm.get('idTecnico')?.invalid && casoForm.get('idTecnico')?.touched" style="color:red; font-size:0.9rem;">Requerido</div>
           </div>
 
+        </div>
+        <div style="margin-top:0.5rem; font-size:0.9rem; color:#6c757d;">
+          <span *ngIf="brigadaSeleccionada">Brigada: {{ brigadaSeleccionada.numero }} - {{ brigadaSeleccionada.nombre }}</span>
+          <span *ngIf="tecnicoSeleccionado" style="margin-left:1rem;">Técnico: {{ tecnicoSeleccionado }}</span>
         </div>
       </div>
 
@@ -194,15 +171,14 @@ export class CrearCasoComponent implements OnInit {
   private fb = inject(FormBuilder);
   private casosService = inject(CasosService);
   private catalogosService = inject(CatalogosService);
+  private authService = inject(AuthService);
+  private brigadasService = inject(BrigadasService);
   private router = inject(Router);
 
   // Catálogos principales
   areas: any[] = [];
   tiposEvento: any[] = [];
   criticidades: any[] = [];
-  regiones: any[] = [];
-  departamentos: any[] = [];
-  municipios: any[] = [];
   tiposBrigada: any[] = [];
 
   // Procesos con filtro
@@ -212,6 +188,14 @@ export class CrearCasoComponent implements OnInit {
   // Brigadas y miembros
   brigadas: any[] = [];
   miembros: any[] = [];
+  brigadaSeleccionada: any = null;
+  tecnicoSeleccionado: string | null = null;
+
+  // Control de autocompletado para Brigada
+  esUsuarioBrigada = false;
+  tieneOtrosRoles = false;
+  brigadaBloqueada = false;
+  tecnicoBloqueado = false;
 
   error = '';
   exito = '';
@@ -226,9 +210,6 @@ export class CrearCasoComponent implements OnInit {
     lugar: ['', Validators.required],
     descripcion: ['', Validators.required],
     titulo: [''],
-    idRegion: ['', Validators.required],
-    idDepartamento: [''],
-    idMunicipio: [''],
     idTipoBrigada: ['', Validators.required],
     idBrigada: ['', Validators.required],
     idTecnico: ['', Validators.required],
@@ -236,180 +217,175 @@ export class CrearCasoComponent implements OnInit {
 
   ngOnInit(): void {
     this.cargarCatalogos();
-    this.cargarRegiones();
     this.cargarTiposBrigada();
-    this.cargarBrigadas();
+    this.verificarUsuarioBrigada();
   }
 
-  // Carga de catálogos
+  // ============================================
+  // DETECCIÓN DE USUARIO BRIGADA Y AUTOCOMPLETADO
+  // ============================================
+  private verificarUsuarioBrigada(): void {
+    const usuario = this.authService.getUsuario();
+    if (!usuario) return;
+
+    const roles = usuario.roles || [];
+    this.esUsuarioBrigada = roles.some(r => r.nombre === 'Brigada');
+    this.tieneOtrosRoles = roles.some(r => r.nombre !== 'Brigada');
+
+    if (this.esUsuarioBrigada) {
+      if (!this.tieneOtrosRoles) {
+        this.brigadaBloqueada = true;
+        this.tecnicoBloqueado = true;
+      }
+
+      this.brigadasService.getMisBrigadas().subscribe({
+        next: (brigadas) => {
+          if (brigadas.length > 0) {
+            const brigada = brigadas[0];
+            this.brigadaSeleccionada = brigada;
+            this.casoForm.patchValue({
+              idBrigada: String(brigada.id),
+              idTipoBrigada: String(brigada.tipoBrigadaId || '')
+            });
+            this.cargarMiembrosDeBrigada(brigada.id);
+            this.seleccionarTecnicoActual(usuario.id);
+          }
+        },
+        error: () => { /* silencio */ }
+      });
+    }
+  }
+
+  private cargarMiembrosDeBrigada(brigadaId: number): void {
+    this.catalogosService.getMiembrosByBrigada(brigadaId).subscribe({
+      next: (res) => {
+        const miembros = (res.data as any)?.miembros || res.data || [];
+        this.miembros = miembros;
+        const usuario = this.authService.getUsuario();
+        if (usuario) {
+          this.seleccionarTecnicoActual(usuario.id);
+        }
+      },
+      error: () => { /* silencio */ }
+    });
+  }
+
+  private seleccionarTecnicoActual(usuarioId: number): void {
+    const miembro = this.miembros.find(m => m.usuario?.id === usuarioId);
+    if (miembro) {
+      this.tecnicoSeleccionado = miembro.usuario?.nombre || 'Técnico';
+      this.casoForm.patchValue({
+        idTecnico: String(miembro.usuario?.id || '')
+      });
+    }
+  }
+
+  // ============================================
+  // CARGA DE CATÁLOGOS
+  // ============================================
   cargarCatalogos() {
     this.catalogosService.getAreas().subscribe({
-      next: (res) => this.areas = res.data || [],
-      error: (err) => console.error('Error áreas', err)
+      next: (res) => { this.areas = res.data || []; },
+      error: () => { /* silencio */ }
     });
 
     this.catalogosService.getProcesos().subscribe({
       next: (res) => {
-        this.todosLosProcesos = res.data || [];
-        this.procesosFiltrados = this.todosLosProcesos; // Mostrar todos al inicio
+        const procesos = (res.data as any)?.procesos || res.data || [];
+        this.todosLosProcesos = procesos;
+        this.procesosFiltrados = this.todosLosProcesos;
       },
-      error: (err) => console.error('Error procesos', err)
+      error: () => { /* silencio */ }
     });
 
     this.catalogosService.getTiposEvento().subscribe({
-      next: (res) => this.tiposEvento = res.data || [],
-      error: (err) => console.error('Error tipos evento', err)
+      next: (res) => { this.tiposEvento = res.data || []; },
+      error: () => { /* silencio */ }
     });
 
     this.catalogosService.getCriticidades().subscribe({
-      next: (res) => this.criticidades = res.data || [],
-      error: (err) => console.error('Error criticidades', err)
-    });
-  }
-
-  cargarRegiones() {
-    this.catalogosService.getRegiones().subscribe({
-      next: (res) => this.regiones = res.data || [],
-      error: (err) => console.error('Error regiones', err)
+      next: (res) => { this.criticidades = res.data || []; },
+      error: () => { /* silencio */ }
     });
   }
 
   cargarTiposBrigada() {
     this.catalogosService.getTiposBrigada().subscribe({
-      next: (res) => this.tiposBrigada = res.data || [],
-      error: (err) => console.error('Error tipos brigada', err)
+      next: (res) => { this.tiposBrigada = res.data || []; },
+      error: () => { /* silencio */ }
     });
   }
 
-  cargarBrigadas() {
-    this.catalogosService.getBrigadas().subscribe({
-      next: (res) => {
-        this.brigadas = res.data?.brigadas || [];
-        this.miembros = [];
-        this.casoForm.patchValue({ idBrigada: '', idTecnico: '' });
-      },
-      error: (err) => console.error('Error brigadas', err)
-    });
-  }
-
-  // Filtro de procesos por área
+  // ============================================
+  // FILTRO DE PROCESOS POR ÁREA
+  // ============================================
   onAreaChange(event: Event) {
     const select = event.target as HTMLSelectElement;
     const areaId = select.value ? +select.value : null;
-
     if (areaId) {
       this.procesosFiltrados = this.todosLosProcesos.filter(p => p.area?.id === areaId);
     } else {
       this.procesosFiltrados = this.todosLosProcesos;
     }
-
-    // Resetear el proceso seleccionado si el área cambió
     this.casoForm.patchValue({ idProceso: '' });
   }
 
-  // Cascada geográfica
-  onRegionChange(event: Event) {
-    const select = event.target as HTMLSelectElement;
-    const regionId = select.value ? +select.value : null;
-    if (regionId) {
-      this.catalogosService.getDepartamentos(regionId).subscribe({
-        next: (res) => {
-          this.departamentos = res.data || [];
-          this.municipios = [];
-          this.casoForm.patchValue({ idDepartamento: '', idMunicipio: '' });
-        },
-        error: (err) => console.error('Error departamentos', err)
-      });
-    } else {
-      this.departamentos = [];
-      this.municipios = [];
-      this.casoForm.patchValue({ idDepartamento: '', idMunicipio: '' });
-    }
-  }
-
-  onDepartamentoChange(event: Event) {
-    const select = event.target as HTMLSelectElement;
-    const deptoId = select.value ? +select.value : null;
-    if (deptoId) {
-      this.catalogosService.getMunicipios(deptoId).subscribe({
-        next: (res) => {
-          this.municipios = res.data || [];
-          this.casoForm.patchValue({ idMunicipio: '' });
-        },
-        error: (err) => console.error('Error municipios', err)
-      });
-    } else {
-      this.municipios = [];
-      this.casoForm.patchValue({ idMunicipio: '' });
-    }
-  }
-
-  // Cascada de brigadas
+  // ============================================
+  // CASCADA DE BRIGADAS
+  // ============================================
   onTipoBrigadaChange(event: Event) {
+    if (this.brigadaBloqueada) return;
+
     const select = event.target as HTMLSelectElement;
     const tipoId = select.value ? +select.value : null;
-
     if (tipoId) {
-      this.cargarBrigadas();
+      this.catalogosService.getBrigadas(tipoId).subscribe({
+        next: (res) => {
+          const brigadas = (res.data as any)?.brigadas || res.data || [];
+          this.brigadas = brigadas;
+          this.miembros = [];
+          this.brigadaSeleccionada = null;
+          this.tecnicoSeleccionado = null;
+          this.casoForm.patchValue({ idBrigada: '', idTecnico: '' });
+        },
+        error: () => { /* silencio */ }
+      });
     } else {
-      this.cargarBrigadas();
+      this.brigadas = [];
+      this.miembros = [];
+      this.brigadaSeleccionada = null;
+      this.tecnicoSeleccionado = null;
+      this.casoForm.patchValue({ idBrigada: '', idTecnico: '' });
     }
   }
 
   onBrigadaChange(event: Event) {
+    if (this.brigadaBloqueada) return;
+
     const select = event.target as HTMLSelectElement;
     const brigadaId = select.value ? +select.value : null;
     if (brigadaId) {
+      this.brigadaSeleccionada = this.brigadas.find(b => b.id === brigadaId) || null;
       this.catalogosService.getMiembrosByBrigada(brigadaId).subscribe({
         next: (res) => {
-          const miembrosResponse = res.data?.miembros ?? res.data ?? [];
-          const miembrosRaw = Array.isArray(miembrosResponse)
-            ? miembrosResponse
-            : (miembrosResponse?.items ?? []);
-
-          this.miembros = this.normalizarMiembros(miembrosRaw);
+          const miembros = (res.data as any)?.miembros || res.data || [];
+          this.miembros = miembros;
+          this.tecnicoSeleccionado = null;
           this.casoForm.patchValue({ idTecnico: '' });
         },
-        error: (err) => {
-          console.error('Error miembros', err);
-          this.miembros = [];
-        }
+        error: () => { /* silencio */ }
       });
     } else {
       this.miembros = [];
+      this.brigadaSeleccionada = null;
+      this.tecnicoSeleccionado = null;
       this.casoForm.patchValue({ idTecnico: '' });
     }
   }
 
-  private normalizarMiembros(miembros: any[]): any[] {
-    if (!Array.isArray(miembros)) {
-      return [];
-    }
-
-    return miembros
-      .map((miembro) => {
-        const usuario = miembro?.usuario ?? miembro?.usuarioData ?? miembro?.user ?? null;
-        const id = usuario?.id ?? miembro?.idUsuario ?? miembro?.usuarioId ?? miembro?.id ?? null;
-        const nombre = usuario?.nombre ?? usuario?.name ?? miembro?.nombre ?? miembro?.correo ?? 'Sin nombre';
-
-        return {
-          ...miembro,
-          usuario: usuario ? { ...usuario, id, nombre } : { id, nombre },
-          id,
-          nombre,
-        };
-      })
-      .filter((miembro) => miembro.id != null);
-  }
-
-  getIdTecnico(miembro: any): string | number | null {
-    return miembro?.usuario?.id ?? miembro?.id ?? null;
-  }
-
-  getNombreTecnico(miembro: any): string {
-    return miembro?.usuario?.nombre ?? miembro?.nombre ?? miembro?.usuario?.name ?? 'Sin nombre';
-  }
-
+  // ============================================
+  // ENVÍO DEL FORMULARIO
+  // ============================================
   onSubmit() {
     if (this.casoForm.invalid) {
       Object.keys(this.casoForm.controls).forEach(key => {
@@ -428,9 +404,15 @@ export class CrearCasoComponent implements OnInit {
 
     const brigada = this.brigadas.find(b => b.id === brigadaId);
     const codigoBrigada = brigada?.numero || '';
+    const nombreBrigada = brigada?.nombre || '';
 
-    const miembro = this.miembros.find(m => m.usuario.id === tecnicoId);
+    const miembro = this.miembros.find(m => m.usuario?.id === tecnicoId);
     const nombreTecnico = miembro?.usuario?.nombre || '';
+
+    // Ubicación geográfica se toma de la brigada seleccionada
+    const regionId = brigada?.region?.id || null;
+    const departamentoId = brigada?.departamento?.id || null;
+    const municipioId = brigada?.municipio?.id || null;
 
     const payload = {
       idArea: +formValue.idArea!,
@@ -441,11 +423,12 @@ export class CrearCasoComponent implements OnInit {
       lugar: formValue.lugar!,
       descripcion: formValue.descripcion!,
       titulo: formValue.titulo || undefined,
-      idRegion: formValue.idRegion ? +formValue.idRegion : undefined,
-      idDepartamento: formValue.idDepartamento ? +formValue.idDepartamento : undefined,
-      idMunicipio: formValue.idMunicipio ? +formValue.idMunicipio : undefined,
+      idRegion: regionId,
+      idDepartamento: departamentoId,
+      idMunicipio: municipioId,
       idBrigadaReportante: brigadaId,
       codigoBrigada: codigoBrigada,
+      nombreBrigada: nombreBrigada,
       nombreTecnico: nombreTecnico,
       idTecnico: tecnicoId,
     };
@@ -460,7 +443,6 @@ export class CrearCasoComponent implements OnInit {
       error: (err) => {
         this.error = err.error?.message || '❌ Error al crear el caso. Verifica los datos e intenta de nuevo.';
         this.enviando = false;
-        console.error('Error al crear caso', err);
       },
     });
   }

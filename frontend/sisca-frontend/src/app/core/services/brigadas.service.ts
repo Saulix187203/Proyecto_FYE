@@ -9,7 +9,7 @@ export interface Brigada {
   id: number;
   numero: string;
   nombre: string;
-  // ... otros campos
+  tipoBrigadaId?: number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -22,6 +22,14 @@ export class BrigadasService {
       `${environment.apiUrl}/brigadas/mis-brigadas`
     ).pipe(
       map(res => res.data?.brigadas || [])
+    );
+  }
+
+  getMiembrosByBrigada(brigadaId: number): Observable<any[]> {
+    return this.http.get<ApiResponse<{ miembros: any[] }>>(
+      `${environment.apiUrl}/brigadas/${brigadaId}/miembros?activo=true`
+    ).pipe(
+      map(res => res.data?.miembros || [])
     );
   }
 }
