@@ -1,9 +1,10 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../../core/models/api-response.model';
 import { Rol, Usuario } from '../../core/models/auth.model';
+import { RolesLocalService } from '../../core/services/roles-local.service';
 
 export interface CrearUsuarioRequest {
   nombre: string;
@@ -30,6 +31,7 @@ export interface ActualizarUsuarioRequest {
 @Injectable({ providedIn: 'root' })
 export class UsuariosService {
   private http = inject(HttpClient);
+  private rolesLocalService = inject(RolesLocalService);
 
   getOpciones(texto?: string, limit: number = 20): Observable<ApiResponse<any[]>> {
     let params = new HttpParams().set('limit', limit.toString());
@@ -55,7 +57,30 @@ export class UsuariosService {
   }
 
   listarRoles(): Observable<ApiResponse<{ roles: Rol[] }>> {
-    return this.http.get<ApiResponse<{ roles: Rol[] }>>(`${environment.apiUrl}/roles`);
+    return this.http.get<ApiResponse<{ roles: Rol[] }>>(`${environment.apiUrl}/roles`).pipe(
+      map((response) => {
+        const rolesBackend = response.data?.roles ?? [];
+        const rolesLocales = this.rolesLocalService.listarRolesComoModelo();
+        const rolesUnicos = [...rolesBackend, ...rolesLocales].filter((rol, index, lista) =>
+          lista.findIndex((item) => item.nombre === rol.nombre) === index
+        );
+
+        return {
+          ...response,
+          data: {
+            roles: rolesUnicos,
+          },
+        };
+      })
+    );
+  }
+
+  crearRol(data: { nombre: string; descripcion?: string }): Observable<ApiResponse<{ rol: Rol }>> {
+    return this.http.post<ApiResponse<{ rol: Rol }>>(`${environment.apiUrl}/roles`, data);
+  }
+
+  eliminarRol(id: number): Observable<ApiResponse<{ rol: Rol }>> {
+    return this.http.delete<ApiResponse<{ rol: Rol }>>(`${environment.apiUrl}/roles/${id}`);
   }
 
   getUsuarioById(id: number): Observable<ApiResponse<{ usuario: Usuario }>> {

@@ -4,6 +4,8 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { UsuariosService, ActualizarUsuarioRequest, CrearUsuarioRequest } from './usuarios.service';
 import { Rol, Usuario } from '../../core/models/auth.model';
 import { CatalogosService } from '../../core/services/catalogos.service';
+import { RolesLocalService } from '../../core/services/roles-local.service';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-usuarios',
@@ -22,7 +24,10 @@ import { CatalogosService } from '../../core/services/catalogos.service';
 
       <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-bottom:1rem; flex-wrap:wrap;">
         <h2 style="margin:0;">Usuarios existentes</h2>
-        <button type="button" (click)="abrirFormularioCreacion()" style="padding:0.6rem 1rem; background:#28a745; color:white; border:none; border-radius:4px; cursor:pointer;">Crear nuevo usuario</button>
+        <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+          <button type="button" (click)="abrirRolesLocal()" style="padding:0.6rem 1rem; background:#6f42c1; color:white; border:none; border-radius:4px; cursor:pointer;">Gestionar roles</button>
+          <button type="button" (click)="abrirFormularioCreacion()" style="padding:0.6rem 1rem; background:#28a745; color:white; border:none; border-radius:4px; cursor:pointer;">Crear nuevo usuario</button>
+        </div>
       </div>
 
       <article style="margin-bottom:2rem; padding:1rem; border:1px solid #ddd; border-radius:8px; background:#fafafa;">
@@ -158,6 +163,8 @@ export class UsuariosComponent implements OnInit {
   private fb = inject(FormBuilder);
   private usuariosService = inject(UsuariosService);
   private catalogosService = inject(CatalogosService);
+  private rolesLocalService = inject(RolesLocalService);
+  private router = inject(Router);
 
   usuarioForm = this.fb.group({
     nombre: ['', Validators.required],
@@ -240,13 +247,33 @@ export class UsuariosComponent implements OnInit {
     this.usuariosService.listarUsuarios().subscribe({
       next: (response) => {
         if (response.success) {
-          this.usuarios = (response.data?.usuarios ?? []).filter((usuario: Usuario) => usuario.activo !== false);
+          this.usuarios = (response.data?.usuarios ?? [])
+            .filter((usuario: Usuario) => usuario.activo !== false)
+            .map((usuario: Usuario) => this.agregarRolesLocales(usuario));
         }
       },
       error: (err) => {
         this.error = err.error?.message || 'No se pudieron cargar los usuarios';
       },
     });
+  }
+
+  private agregarRolesLocales(usuario: Usuario): Usuario {
+    const rolesLocales = this.rolesLocalService.obtenerRolesDeUsuario(usuario);
+    const rolesLocalesModel = rolesLocales
+      .map((nombreRol) => {
+        const rolLocal = this.rolesLocalService.listarRoles().find((rol) => rol.nombre === nombreRol);
+        return rolLocal ? { id: -(rolLocal.id), nombre: rolLocal.nombre } : null;
+      })
+      .filter((rol): rol is Rol => !!rol);
+
+    const rolesBackend = (usuario.roles ?? []).map((rol) => ({ ...rol }));
+    const rolesCombinados = [...rolesBackend, ...rolesLocalesModel.filter((rol) => !rolesBackend.some((item) => item.nombre === rol.nombre))];
+
+    return {
+      ...usuario,
+      roles: rolesCombinados,
+    };
   }
 
   cargarRoles() {
@@ -303,18 +330,31 @@ export class UsuariosComponent implements OnInit {
       return;
     }
 
-    this.usuariosService.actualizarRolesUsuario(this.usuarioSeleccionadoParaRoles.id, { roles: this.rolesSeleccionados }).subscribe({
-      next: (response) => {
-        if (response.success) {
-          this.mensaje = 'Roles actualizados correctamente';
-          this.cerrarModalRoles();
-          this.cargarUsuarios();
-        }
-      },
-      error: (err) => {
-        this.error = err.error?.message || 'No se pudieron actualizar los roles';
-      },
-    });
+    const rolesSeleccionados = this.roles.filter((rol) => this.rolesSeleccionados.includes(rol.id));
+    const rolesLocales = rolesSeleccionados.filter((rol) => rol.id < 0).map((rol) => rol.nombre);
+    const rolesBackend = rolesSeleccionados.filter((rol) => rol.id >= 0).map((rol) => rol.id);
+
+    this.rolesLocalService.guardarAsignacionesParaUsuario(this.usuarioSeleccionadoParaRoles, rolesLocales);
+
+    if (rolesBackend.length > 0 || (this.usuarioSeleccionadoParaRoles.roles ?? []).some((rol) => rol.id >= 0)) {
+      this.usuariosService.actualizarRolesUsuario(this.usuarioSeleccionadoParaRoles.id, { roles: rolesBackend }).subscribe({
+        next: (response) => {
+          if (response.success) {
+            this.mensaje = 'Roles actualizados correctamente';
+            this.cerrarModalRoles();
+            this.cargarUsuarios();
+          }
+        },
+        error: (err) => {
+          this.error = err.error?.message || 'No se pudieron actualizar los roles';
+        },
+      });
+      return;
+    }
+
+    this.mensaje = 'Roles actualizados correctamente';
+    this.cerrarModalRoles();
+    this.cargarUsuarios();
   }
 
   abrirFormularioCreacion() {
@@ -325,6 +365,10 @@ export class UsuariosComponent implements OnInit {
     this.usuarioForm.reset({ activo: true, password: '' });
     this.brigadas = [];
     this.mostrarFormulario = true;
+  }
+
+  abrirRolesLocal() {
+    this.router.navigate(['/roles-local']);
   }
 
   editarUsuario(usuario: Usuario) {
@@ -368,6 +412,8 @@ export class UsuariosComponent implements OnInit {
     const activo = !!this.usuarioForm.value.activo;
     const rolSeleccionado = this.usuarioForm.value.roles as number | null;
     const roles = rolSeleccionado ? [rolSeleccionado] : [];
+    const rolesBackend = roles.filter((id) => id >= 0);
+    const rolesLocales = roles.filter((id) => id < 0).map((id) => this.roles.find((rol) => rol.id === id)?.nombre).filter((nombre): nombre is string => !!nombre);
 
     // Validación condicional para usuarios de brigada
     const tipoBrigadaIdForValidation = this.usuarioForm.value.tipoBrigadaId as number | null;
@@ -424,7 +470,7 @@ export class UsuariosComponent implements OnInit {
       };
 
       const cambiarRoles = () => {
-        this.usuariosService.actualizarRolesUsuario(this.usuarioEditId!, { roles }).subscribe({
+        this.usuariosService.actualizarRolesUsuario(this.usuarioEditId!, { roles: rolesBackend }).subscribe({
           next: (response) => {
             if (response.success) {
               this.mensaje = 'Roles actualizados correctamente';
@@ -467,7 +513,7 @@ export class UsuariosComponent implements OnInit {
       correo,
       password,
       activo,
-      roles,
+      roles: rolesBackend,
     };
 
     // Añadir campos de brigada si están presentes
@@ -480,6 +526,9 @@ export class UsuariosComponent implements OnInit {
       next: (response) => {
         if (response.success) {
           const usuarioCreado = response.data?.usuario;
+          if (usuarioCreado) {
+            this.rolesLocalService.guardarAsignacionesParaUsuario(usuarioCreado, rolesLocales);
+          }
           const brigadaSeleccionada = this.usuarioForm.value.codigoBrigada?.toString().trim() || '';
           const brigada = this.brigadas.find((item) => item.numero === brigadaSeleccionada || item.id?.toString() === brigadaSeleccionada);
 

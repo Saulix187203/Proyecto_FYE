@@ -1,6 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { RouterOutlet, RouterLink, Router } from '@angular/router';
 import { AuthService } from './core/services/auth.service';
+import { RolesLocalService } from './core/services/roles-local.service';
 import { NgIf } from '@angular/common';
 
 @Component({
@@ -16,6 +17,7 @@ import { NgIf } from '@angular/common';
       <a routerLink="/perfil">Perfil</a>
       <a *ngIf="auth.hasRole('Administrador')" routerLink="/brigadas">Brigadas</a>
       <a *ngIf="auth.hasRole('Administrador')" routerLink="/usuarios">Usuarios</a>
+      <a *ngIf="auth.hasRole('Administrador')" routerLink="/roles-local">Roles</a>
       <button (click)="logout()" style="margin-left:auto;">Cerrar sesión</button>
     </nav>
     <main>
@@ -31,6 +33,7 @@ import { NgIf } from '@angular/common';
 export class AppComponent {
   auth = inject(AuthService);
   private router = inject(Router);
+  private rolesLocalService = inject(RolesLocalService);
 
   logout() {
     this.auth.logout();
@@ -40,6 +43,9 @@ export class AppComponent {
   // Método para determinar si el usuario puede ver el Dashboard
   puedeVerDashboard(): boolean {
     const rolesPermitidos = ['Administrador', 'SYMA', 'Gestión y Control SYMA', 'Gerencia'];
-    return rolesPermitidos.some(r => this.auth.hasRole(r));
+    if (rolesPermitidos.some(r => this.auth.hasRole(r))) {
+      return true;
+    }
+    return this.rolesLocalService.hasPermissionForCurrentUser('dashboard');
   }
 }

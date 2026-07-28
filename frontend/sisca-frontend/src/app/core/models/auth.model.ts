@@ -10,6 +10,10 @@ export interface Usuario {
 export interface Rol {
   id: number;
   nombre: string;
+  descripcion?: string | null;
+  activo?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface LoginRequest {
