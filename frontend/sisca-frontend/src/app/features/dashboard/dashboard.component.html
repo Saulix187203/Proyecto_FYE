@@ -1,0 +1,115 @@
+<div class="dashboard-page">
+  <div *ngIf="!isLoading; else loading" class="dashboard-content">
+    <div class="dashboard-header">
+      <h1>Dashboard</h1>
+      <p>Resumen general de casos y acciones correctivas.</p>
+    </div>
+
+    <section class="kpi-grid" *ngIf="resumen">
+      <div class="kpi-card">
+        <h3>Total de casos</h3>
+        <p class="kpi-value">{{ resumen.totalCasos }}</p>
+      </div>
+      <div class="kpi-card">
+        <h3>Abiertos</h3>
+        <p class="kpi-value">{{ resumen.casosAbiertos }}</p>
+      </div>
+      <div class="kpi-card">
+        <h3>Cerrados</h3>
+        <p class="kpi-value">{{ resumen.casosCerrados }}</p>
+      </div>
+      <div class="kpi-card">
+        <h3>En revisión</h3>
+        <p class="kpi-value">{{ resumen.casosEnRevision }}</p>
+      </div>
+      <div class="kpi-card">
+        <h3>Acciones pendientes</h3>
+        <p class="kpi-value">{{ resumen.accionesPendientes }}</p>
+      </div>
+      <div class="kpi-card">
+        <h3>Acciones vencidas</h3>
+        <p class="kpi-value">{{ resumen.accionesVencidas }}</p>
+      </div>
+      <div class="kpi-card">
+        <h3>Acciones en validación</h3>
+        <p class="kpi-value">{{ resumen.accionesEnValidacion }}</p>
+      </div>
+    </section>
+
+    <section class="charts-grid">
+      <div class="chart-card">
+        <h3>Casos por estado</h3>
+        <div class="chart-container">
+          <canvas baseChart [data]="barChartDataEstado" [options]="barChartOptions" type="bar"></canvas>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <h3>Casos por área</h3>
+        <div class="chart-container">
+          <canvas baseChart [data]="barChartDataArea" [options]="barChartOptions" type="bar"></canvas>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <h3>Casos por criticidad</h3>
+        <div class="chart-container">
+          <canvas baseChart [data]="doughnutChartDataCriticidad" [options]="doughnutChartOptions" type="doughnut"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <section class="tables-grid">
+      <div class="table-card">
+        <h3>Últimas acciones vencidas</h3>
+        <table class="table table-striped table-hover full-width-table">
+          <thead>
+            <tr>
+              <th>Descripción</th>
+              <th>Responsable</th>
+              <th>Fecha compromiso</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let accion of accionesVencidas">
+              <td>{{ accion.descripcion }}</td>
+              <td>{{ accion.responsable?.nombre || 'Sin asignar' }}</td>
+              <td>{{ accion.fechaCompromiso | date:'dd/MM/yyyy' }}</td>
+              <td>{{ accion.estado?.nombre || 'Sin estado' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="table-card">
+        <h3>Últimos casos reportados</h3>
+        <table class="table table-striped table-hover full-width-table">
+          <thead>
+            <tr>
+              <th>Correlativo</th>
+              <th>Descripción</th>
+              <th>Estado</th>
+              <th>Fecha</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let caso of ultimosCasos">
+              <td>{{ caso.correlativo }}</td>
+              <td>{{ caso.area?.nombre || 'Sin área' }}</td>
+              <td>{{ caso.estado?.nombre || 'Sin estado' }}</td>
+              <td>{{ caso.fechaReporte | date:'dd/MM/yyyy' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <ng-template #loading>
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>Cargando dashboard...</p>
+    </div>
+  </ng-template>
+</div>
