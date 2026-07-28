@@ -1,7 +1,0 @@
-{
-  "/api": {
-    "target": "https://3lgb0rk8-3000.use2.devtunnels.ms/",
-    "secure": false,
-    "changeOrigin": true
-  }
-}
