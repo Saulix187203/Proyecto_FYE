@@ -51,6 +51,12 @@ export const routes: Routes = [
     data: { roles: ['Administrador'] },
     loadComponent: () => import('./features/usuarios/usuarios.component').then(m => m.UsuariosComponent),
   },
+  {
+    path: 'roles-local',
+    canActivate: [authGuard, roleGuard],
+    data: { roles: ['Administrador'] },
+    loadComponent: () => import('./features/usuarios/roles-local.component').then(m => m.RolesLocalComponent),
+  },
   { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
   { path: '**', redirectTo: '/dashboard' },
 ];
