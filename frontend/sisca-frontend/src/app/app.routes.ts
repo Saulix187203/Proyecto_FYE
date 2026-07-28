@@ -51,6 +51,17 @@ export const routes: Routes = [
     data: { roles: ['Administrador'] },
     loadComponent: () => import('./features/usuarios/usuarios.component').then(m => m.UsuariosComponent),
   },
+  {
+    path: 'brigadas',
+    canActivate: [authGuard, roleGuard],
+    data: { roles: ['Administrador'] },
+    children: [
+      { path: '', loadComponent: () => import('./features/brigadas/brigadas.component').then(m => m.BrigadasComponent) },
+      { path: 'nuevo', loadComponent: () => import('./features/brigadas/brigada-form.component').then(m => m.BrigadaFormComponent) },
+      { path: ':id', loadComponent: () => import('./features/brigadas/brigada-form.component').then(m => m.BrigadaFormComponent) },
+      { path: ':id/miembros', loadComponent: () => import('./features/brigadas/miembros.component').then(m => m.MiembrosComponent) },
+    ],
+  },
   { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
   { path: '**', redirectTo: '/dashboard' },
 ];

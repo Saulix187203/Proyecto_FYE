@@ -14,6 +14,7 @@ import { NgIf } from '@angular/common';
       <a routerLink="/casos">Casos</a>
       <a routerLink="/notificaciones">Notificaciones</a>
       <a routerLink="/perfil">Perfil</a>
+      <a *ngIf="auth.hasRole('Administrador')" routerLink="/brigadas">Brigadas</a>
       <a *ngIf="auth.hasRole('Administrador')" routerLink="/usuarios">Usuarios</a>
       <button (click)="logout()" style="margin-left:auto;">Cerrar sesión</button>
     </nav>

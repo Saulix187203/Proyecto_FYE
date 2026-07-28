@@ -14,11 +14,11 @@ import { NgIf } from '@angular/common';
       <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
         <div>
           <label>Correo:</label>
-          <input formControlName="correo" type="email" placeholder="admin@sisca.com" style="width:100%; padding:0.5rem; margin:0.5rem 0;">
+          <input formControlName="correo" type="email" placeholder="correo@ejemplo.com" style="width:100%; padding:0.5rem; margin:0.5rem 0;">
         </div>
         <div>
           <label>Contraseña:</label>
-          <input formControlName="password" type="password" placeholder="Admin123*" style="width:100%; padding:0.5rem; margin:0.5rem 0;">
+          <input formControlName="password" type="password" placeholder="Contraseña" style="width:100%; padding:0.5rem; margin:0.5rem 0;">
         </div>
         <button type="submit" [disabled]="loginForm.invalid" style="padding:0.5rem 1rem; background:#007bff; color:white; border:none; border-radius:4px; cursor:pointer;">
           Ingresar
