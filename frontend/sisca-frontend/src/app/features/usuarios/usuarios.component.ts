@@ -20,8 +20,12 @@ import { CatalogosService } from '../../core/services/catalogos.service';
         {{ error }}
       </div>
 
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-bottom:1rem; flex-wrap:wrap;">
+        <h2 style="margin:0;">Usuarios existentes</h2>
+        <button type="button" (click)="abrirFormularioCreacion()" style="padding:0.6rem 1rem; background:#28a745; color:white; border:none; border-radius:4px; cursor:pointer;">Crear nuevo usuario</button>
+      </div>
+
       <article style="margin-bottom:2rem; padding:1rem; border:1px solid #ddd; border-radius:8px; background:#fafafa;">
-        <h2>Usuarios existentes</h2>
         <table style="width:100%; border-collapse:collapse; margin-top:1rem;">
           <thead>
             <tr style="background:#f5f5f5; text-align:left;">
@@ -49,60 +53,66 @@ import { CatalogosService } from '../../core/services/catalogos.service';
         </table>
       </article>
 
-      <article style="padding:1rem; border:1px solid #ddd; border-radius:8px; background:#fff;">
-        <h2>{{ modoEdicion ? 'Editar usuario' : 'Crear nuevo usuario' }}</h2>
-        <form [formGroup]="usuarioForm" (ngSubmit)="guardarUsuario()" style="display:grid; gap:1rem;">
-          <label>
-            Nombre
-            <input formControlName="nombre" type="text" placeholder="Usuario Prueba SISCA" style="width:100%; padding:0.5rem; border:1px solid #ccc; border-radius:4px;">
-          </label>
-          <label>
-            Correo
-            <input formControlName="correo" type="email" placeholder="usuario.prueba@sisca.com" style="width:100%; padding:0.5rem; border:1px solid #ccc; border-radius:4px;">
-          </label>
-          <label>
-            Contraseña {{ modoEdicion ? '(opcional para mantener la actual)' : '' }}
-            <input formControlName="password" type="password" placeholder="Usuario123*" style="width:100%; padding:0.5rem; border:1px solid #ccc; border-radius:4px;">
-          </label>
-          <label>
-            Rol
-            <select formControlName="roles" style="width:100%; padding:0.5rem; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;">
-              <option [ngValue]="null" disabled>Selecciona un rol</option>
-              <option *ngFor="let rol of roles" [ngValue]="rol.id">{{ rol.nombre }}</option>
-            </select>
-          </label>
-          <small style="color:#6c757d;">Selecciona un rol para el usuario.</small>
-          <div *ngIf="esRolBrigada()" style="display:grid; gap:0.5rem;">
+      <div *ngIf="mostrarFormulario" style="position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:1100; padding:1rem;">
+        <div style="width:min(100%, 720px); max-height:90vh; overflow:auto; background:#fff; border-radius:10px; padding:1.25rem; box-shadow:0 12px 35px rgba(0,0,0,0.2);">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-bottom:1rem;">
+            <h2 style="margin:0;">{{ modoEdicion ? 'Editar usuario' : 'Crear nuevo usuario' }}</h2>
+            <button type="button" (click)="cancelarEdicion()" style="border:none; background:transparent; font-size:1.2rem; cursor:pointer;">✕</button>
+          </div>
+
+          <form [formGroup]="usuarioForm" (ngSubmit)="guardarUsuario()" style="display:grid; gap:1rem;">
             <label>
-              Tipo de brigada
-              <select formControlName="tipoBrigadaId" style="width:100%; padding:0.5rem; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;">
-                <option [ngValue]="null" disabled>Selecciona tipo de brigada</option>
-                <option *ngFor="let t of tiposBrigada" [ngValue]="t.id">{{ t.nombre }}</option>
-              </select>
+              Nombre
+              <input formControlName="nombre" type="text" placeholder="Usuario Prueba SISCA" style="width:100%; padding:0.5rem; border:1px solid #ccc; border-radius:4px;">
             </label>
             <label>
-              Brigada
-              <select formControlName="codigoBrigada" style="width:100%; padding:0.5rem; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;">
-                <option [ngValue]="null" disabled>Selecciona una brigada</option>
-                <option *ngFor="let brigada of brigadas" [ngValue]="brigada.numero">{{ getBrigadaLabel(brigada) }}</option>
+              Correo
+              <input formControlName="correo" type="email" placeholder="usuario.prueba@sisca.com" style="width:100%; padding:0.5rem; border:1px solid #ccc; border-radius:4px;">
+            </label>
+            <label>
+              Contraseña {{ modoEdicion ? '(opcional para mantener la actual)' : '' }}
+              <input formControlName="password" type="password" placeholder="Usuario123*" style="width:100%; padding:0.5rem; border:1px solid #ccc; border-radius:4px;">
+            </label>
+            <label>
+              Rol
+              <select formControlName="roles" style="width:100%; padding:0.5rem; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;">
+                <option [ngValue]="null" disabled>Selecciona un rol</option>
+                <option *ngFor="let rol of roles" [ngValue]="rol.id">{{ rol.nombre }}</option>
               </select>
             </label>
-            <small style="color:#6c757d;">Seleccione la brigada a la que pertenecerá el usuario.</small>
-          </div>
-          <label style="display:flex; align-items:center; gap:0.5rem;">
-            <input formControlName="activo" type="checkbox">
-            Activo
-          </label>
-          <div style="display:flex; gap:1rem; flex-wrap:wrap;">
-            <button type="submit" [disabled]="usuarioForm.invalid" style="width:fit-content; padding:0.75rem 1.25rem; background:#007bff; color:#fff; border:none; border-radius:4px; cursor:pointer;">
-              {{ modoEdicion ? 'Guardar cambios' : 'Crear usuario' }}
-            </button>
-            <button *ngIf="modoEdicion" type="button" (click)="cancelarEdicion()" style="width:fit-content; padding:0.75rem 1.25rem; background:#6c757d; color:#fff; border:none; border-radius:4px; cursor:pointer;">
-              Cancelar
-            </button>
-          </div>
-        </form>
-      </article>
+            <small style="color:#6c757d;">Selecciona un rol para el usuario.</small>
+            <div *ngIf="esRolBrigada()" style="display:grid; gap:0.5rem;">
+              <label>
+                Tipo de brigada
+                <select formControlName="tipoBrigadaId" style="width:100%; padding:0.5rem; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;">
+                  <option [ngValue]="null" disabled>Selecciona tipo de brigada</option>
+                  <option *ngFor="let t of tiposBrigada" [ngValue]="t.id">{{ t.nombre }}</option>
+                </select>
+              </label>
+              <label>
+                Brigada
+                <select formControlName="codigoBrigada" style="width:100%; padding:0.5rem; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;">
+                  <option [ngValue]="null" disabled>Selecciona una brigada</option>
+                  <option *ngFor="let brigada of brigadas" [ngValue]="brigada.numero">{{ getBrigadaLabel(brigada) }}</option>
+                </select>
+              </label>
+              <small style="color:#6c757d;">Seleccione la brigada a la que pertenecerá el usuario.</small>
+            </div>
+            <label style="display:flex; align-items:center; gap:0.5rem;">
+              <input formControlName="activo" type="checkbox">
+              Activo
+            </label>
+            <div style="display:flex; gap:1rem; flex-wrap:wrap; justify-content:flex-end;">
+              <button type="button" (click)="cancelarEdicion()" style="padding:0.75rem 1.25rem; background:#6c757d; color:#fff; border:none; border-radius:4px; cursor:pointer;">
+                Cancelar
+              </button>
+              <button type="submit" [disabled]="usuarioForm.invalid" style="padding:0.75rem 1.25rem; background:#007bff; color:#fff; border:none; border-radius:4px; cursor:pointer;">
+                {{ modoEdicion ? 'Guardar cambios' : 'Crear usuario' }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
 
       <div *ngIf="mostrarModalRoles" style="position:fixed; inset:0; background:rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; z-index:1000; padding:1rem;">
         <div style="width:min(100%, 480px); background:#fff; border-radius:8px; padding:1.25rem; box-shadow:0 10px 30px rgba(0,0,0,0.2);">
@@ -141,6 +151,7 @@ export class UsuariosComponent implements OnInit {
   modoEdicion = false;
   usuarioEditId: number | null = null;
   mostrarModalRoles = false;
+  mostrarFormulario = false;
   usuarioSeleccionadoParaRoles: Usuario | null = null;
   rolesSeleccionados: number[] = [];
 
@@ -306,6 +317,16 @@ export class UsuariosComponent implements OnInit {
     });
   }
 
+  abrirFormularioCreacion() {
+    this.modoEdicion = false;
+    this.usuarioEditId = null;
+    this.mensaje = '';
+    this.error = '';
+    this.usuarioForm.reset({ activo: true, password: '' });
+    this.brigadas = [];
+    this.mostrarFormulario = true;
+  }
+
   editarUsuario(usuario: Usuario) {
     this.modoEdicion = true;
     this.usuarioEditId = usuario.id;
@@ -324,6 +345,8 @@ export class UsuariosComponent implements OnInit {
     if (this.esRolBrigada()) {
       this.cargarBrigadas(this.usuarioForm.value.tipoBrigadaId as number | null);
     }
+
+    this.mostrarFormulario = true;
   }
 
   cancelarEdicion() {
@@ -333,6 +356,7 @@ export class UsuariosComponent implements OnInit {
     this.brigadas = [];
     this.error = '';
     this.mensaje = '';
+    this.mostrarFormulario = false;
   }
 
   guardarUsuario() {
