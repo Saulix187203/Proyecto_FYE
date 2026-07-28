@@ -4,6 +4,9 @@ import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CasosService, FiltrosCasos } from '../services/casos.service';
 import { CatalogosService } from '../../../core/services/catalogos.service';
+import { AuthService } from '../../../core/services/auth.service';
+import { BrigadasService } from '../../../core/services/brigadas.service';
+import { UsuariosService } from '../services/usuarios.service';
 import { Caso } from '../../../core/models/caso.model';
 
 @Component({
@@ -13,38 +16,75 @@ import { Caso } from '../../../core/models/caso.model';
   template: `
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
       <h2 style="margin:0;">Listado de Casos</h2>
-      <a routerLink="/casos/crear" style="display:inline-block; padding:0.5rem 1rem; background:#28a745; color:white; text-decoration:none; border-radius:4px;">
+      <a *ngIf="puedeCrearCaso()" routerLink="/casos/crear" style="display:inline-block; padding:0.5rem 1rem; background:#28a745; color:white; text-decoration:none; border-radius:4px;">
         + Nuevo Caso
       </a>
     </div>
 
+    <!-- Mensaje de filtro por brigada (solo para usuarios Brigada) -->
+    <div *ngIf="filtroBrigadaActivo" style="background:#e9f7fe; padding:0.5rem 1rem; border-radius:4px; margin-bottom:1rem; border-left:4px solid #007bff;">
+      <strong>📌 Mostrando solo casos de tu brigada:</strong> {{ nombreBrigada || 'N/A' }}
+    </div>
+
     <!-- Filtros -->
     <form [formGroup]="filtroForm" (ngSubmit)="aplicarFiltros()" style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1rem; padding:1rem; background:#f8f9fa; border-radius:4px; align-items:center;">
+      <!-- Búsqueda por texto -->
       <input formControlName="texto" placeholder="Buscar..." style="padding:0.3rem; flex:1; min-width:150px; border:1px solid #ced4da; border-radius:4px;">
+
+      <!-- Estado -->
       <select formControlName="estado" style="padding:0.3rem; border:1px solid #ced4da; border-radius:4px; min-width:120px;">
         <option value="">Todos los estados</option>
         <option *ngFor="let e of estados" [value]="e.id">{{ e.nombre }}</option>
       </select>
+
+      <!-- Área -->
       <select formControlName="area" style="padding:0.3rem; border:1px solid #ced4da; border-radius:4px; min-width:120px;">
         <option value="">Todas las áreas</option>
         <option *ngFor="let a of areas" [value]="a.id">{{ a.nombre }}</option>
       </select>
+
+      <!-- Criticidad -->
       <select formControlName="criticidad" style="padding:0.3rem; border:1px solid #ced4da; border-radius:4px; min-width:120px;">
         <option value="">Todas las criticidades</option>
         <option *ngFor="let c of criticidades" [value]="c.id">{{ c.nombre }}</option>
       </select>
+
+      <!-- Región (cascada) -->
+      <select formControlName="region" (change)="onRegionChange($event)" style="padding:0.3rem; border:1px solid #ced4da; border-radius:4px; min-width:120px;">
+        <option value="">Todas las regiones</option>
+        <option *ngFor="let r of regiones" [value]="r.id">{{ r.nombre }}</option>
+      </select>
+
+      <!-- Departamento (cascada) -->
+      <select formControlName="departamento" (change)="onDepartamentoChange($event)" style="padding:0.3rem; border:1px solid #ced4da; border-radius:4px; min-width:120px;">
+        <option value="">Todos los departamentos</option>
+        <option *ngFor="let d of departamentos" [value]="d.id">{{ d.nombre }}</option>
+      </select>
+
+      <!-- Municipio (cascada) -->
+      <select formControlName="municipio" style="padding:0.3rem; border:1px solid #ced4da; border-radius:4px; min-width:120px;">
+        <option value="">Todos los municipios</option>
+        <option *ngFor="let m of municipios" [value]="m.id">{{ m.nombre }}</option>
+      </select>
+
+      <!-- Técnico que reporta (usuario) -->
+      <select formControlName="tecnico" style="padding:0.3rem; border:1px solid #ced4da; border-radius:4px; min-width:120px;">
+        <option value="">Todos los técnicos</option>
+        <option *ngFor="let u of tecnicos" [value]="u.id">{{ u.nombre }}</option>
+      </select>
+
+      <!-- Fechas -->
       <input formControlName="fechaDesde" type="datetime-local" placeholder="Desde" style="padding:0.3rem; border:1px solid #ced4da; border-radius:4px;">
       <input formControlName="fechaHasta" type="datetime-local" placeholder="Hasta" style="padding:0.3rem; border:1px solid #ced4da; border-radius:4px;">
+
+      <!-- Botones -->
       <button type="submit" style="padding:0.3rem 1rem; background:#007bff; color:white; border:none; border-radius:4px; cursor:pointer;">Filtrar</button>
       <button type="button" (click)="limpiarFiltros()" style="padding:0.3rem 1rem; background:#6c757d; color:white; border:none; border-radius:4px; cursor:pointer;">Limpiar</button>
     </form>
 
+    <!-- Mensaje de acceso denegado (por si viene de redirección) -->
     <div *ngIf="accessDeniedMessage" style="background:#fff3cd; padding:0.75rem; border-radius:4px; margin-bottom:1rem; color:#856404; border-left:4px solid #ffeeba;">
       {{ accessDeniedMessage }}
-    </div>
-    <!-- Mensaje de depuración -->
-    <div *ngIf="debugInfo" style="background:#e8f4fd; padding:0.5rem; border-radius:4px; margin-bottom:1rem; font-size:0.9rem; border-left:3px solid #007bff;">
-      <strong>Depuración:</strong> {{ debugInfo }}
     </div>
 
     <!-- Cargando -->
@@ -116,29 +156,46 @@ import { Caso } from '../../../core/models/caso.model';
 export class ListadoCasosComponent implements OnInit {
   private casosService = inject(CasosService);
   private catalogosService = inject(CatalogosService);
+  private authService = inject(AuthService);
+  private brigadasService = inject(BrigadasService);
+  private usuariosService = inject(UsuariosService);
   private fb = inject(FormBuilder);
   private route = inject(ActivatedRoute);
 
   casos: Caso[] = [];
   accessDeniedMessage = '';
+  cargando = true;
+  error = '';
+
+  // Catálogos para filtros
   areas: any[] = [];
   estados: any[] = [];
   criticidades: any[] = [];
-  cargando = true;
-  error = '';
-  debugInfo = '';
+  regiones: any[] = [];
+  departamentos: any[] = [];
+  municipios: any[] = [];
+  tecnicos: any[] = [];   // Usuarios para filtro de técnico reportante
+
+  // Variables para filtro automático por brigada
+  filtroBrigadaActivo = false;
+  nombreBrigada = '';
 
   filtroForm = this.fb.group({
     texto: [''],
     estado: [''],
     area: [''],
     criticidad: [''],
+    region: [''],
+    departamento: [''],
+    municipio: [''],
+    tecnico: [''],
     fechaDesde: [''],
     fechaHasta: [''],
   });
 
   ngOnInit(): void {
     this.cargarCatalogos();
+    this.cargarDependencias();
     this.route.queryParams.subscribe(params => {
       if (params['accessDenied'] === 'usuarios') {
         this.accessDeniedMessage = 'No tienes permiso para acceder a Usuarios.';
@@ -149,88 +206,148 @@ export class ListadoCasosComponent implements OnInit {
     this.aplicarFiltros();
   }
 
-  cargarCatalogos() {
+  private cargarCatalogos(): void {
     this.catalogosService.getAreas().subscribe({
-      next: (res) => {
-        this.areas = res.data || [];
-        console.log('Áreas cargadas:', this.areas.length);
-      },
-      error: (err) => console.error('Error cargando áreas', err)
+      next: (res) => { this.areas = res.data || []; },
+      error: () => { /* silencio */ }
     });
     this.catalogosService.getEstadosCaso().subscribe({
-      next: (res) => {
-        this.estados = res.data || [];
-        console.log('Estados cargados:', this.estados.length);
-      },
-      error: (err) => console.error('Error cargando estados', err)
+      next: (res) => { this.estados = res.data || []; },
+      error: () => { /* silencio */ }
     });
     this.catalogosService.getCriticidades().subscribe({
-      next: (res) => {
-        this.criticidades = res.data || [];
-        console.log('Criticidades cargadas:', this.criticidades.length);
-      },
-      error: (err) => console.error('Error cargando criticidades', err)
+      next: (res) => { this.criticidades = res.data || []; },
+      error: () => { /* silencio */ }
+    });
+    this.catalogosService.getRegiones().subscribe({
+      next: (res) => { this.regiones = res.data || []; },
+      error: () => { /* silencio */ }
+    });
+    // Cargar técnicos (usuarios con opciones)
+    this.usuariosService.getOpciones().subscribe({
+      next: (data) => { this.tecnicos = data || []; },
+      error: () => { /* silencio */ }
     });
   }
 
-  aplicarFiltros() {
+  private cargarDependencias(): void {
+    // Si no hay regiones, no se cargan departamentos/municipios
+  }
+
+  // Cascada geográfica en filtros
+  onRegionChange(event: Event): void {
+    const select = event.target as HTMLSelectElement;
+    const regionId = select.value ? +select.value : null;
+    this.departamentos = [];
+    this.municipios = [];
+    this.filtroForm.patchValue({ departamento: '', municipio: '' });
+    if (regionId) {
+      this.catalogosService.getDepartamentos(regionId).subscribe({
+        next: (res) => { this.departamentos = res.data || []; },
+        error: () => { /* silencio */ }
+      });
+    }
+  }
+
+  onDepartamentoChange(event: Event): void {
+    const select = event.target as HTMLSelectElement;
+    const deptoId = select.value ? +select.value : null;
+    this.municipios = [];
+    this.filtroForm.patchValue({ municipio: '' });
+    if (deptoId) {
+      this.catalogosService.getMunicipios(deptoId).subscribe({
+        next: (res) => { this.municipios = res.data || []; },
+        error: () => { /* silencio */ }
+      });
+    }
+  }
+
+  // Determinar si el usuario puede crear casos (según rol)
+  puedeCrearCaso(): boolean {
+    const rolesPermitidos = ['Administrador', 'Brigada', 'PRL Contratista', 'SYMA'];
+    const usuario = this.authService.getUsuario();
+    if (!usuario) return false;
+    return usuario.roles?.some(r => rolesPermitidos.includes(r.nombre)) || false;
+  }
+
+  aplicarFiltros(): void {
     this.cargando = true;
     this.error = '';
-    this.debugInfo = 'Cargando casos...';
 
     const formVal = this.filtroForm.value;
     const filtros: FiltrosCasos = {};
-    
+
     if (formVal.texto) filtros.texto = formVal.texto;
     if (formVal.estado) filtros.estado = formVal.estado;
     if (formVal.area) filtros.area = formVal.area;
     if (formVal.criticidad) filtros.criticidad = formVal.criticidad;
+    if (formVal.region) filtros.region = formVal.region;
+    if (formVal.departamento) filtros.departamento = formVal.departamento;
+    if (formVal.municipio) filtros.municipio = formVal.municipio;
+    if (formVal.tecnico) filtros.tecnico = formVal.tecnico; // El backend debe soportar este filtro
     if (formVal.fechaDesde) filtros.fechaDesde = formVal.fechaDesde;
     if (formVal.fechaHasta) filtros.fechaHasta = formVal.fechaHasta;
 
-    console.log('Filtros aplicados:', filtros);
+    // Verificar si el usuario es Brigada y aplicar filtro automático
+    const usuario = this.authService.getUsuario();
+    const esBrigada = usuario?.roles?.some(r => r.nombre === 'Brigada') || false;
+    if (esBrigada) {
+      this.brigadasService.getMisBrigadas().subscribe({
+        next: (brigadas) => {
+          if (brigadas.length > 0) {
+            const brigada = brigadas[0];
+            filtros.brigada = brigada.id;
+            this.filtroBrigadaActivo = true;
+            this.nombreBrigada = `${brigada.numero} - ${brigada.nombre}`;
+          } else {
+            this.filtroBrigadaActivo = false;
+            this.nombreBrigada = '';
+          }
+          this.ejecutarBusqueda(filtros);
+        },
+        error: () => {
+          // Si falla, intentar sin filtro de brigada
+          this.filtroBrigadaActivo = false;
+          this.nombreBrigada = '';
+          this.ejecutarBusqueda(filtros);
+        }
+      });
+    } else {
+      this.filtroBrigadaActivo = false;
+      this.nombreBrigada = '';
+      this.ejecutarBusqueda(filtros);
+    }
+  }
 
+  private ejecutarBusqueda(filtros: FiltrosCasos): void {
     this.casosService.listarCasos(filtros).subscribe({
       next: (res) => {
-        console.log('Respuesta completa de casos:', res);
-        console.log('Tipo de res.data:', typeof res.data);
-        console.log('¿res.data es array?', Array.isArray(res.data));
-        
-        // Asegurar que casos sea un array
         let dataArray: any[] = [];
         if (res.success && res.data) {
           if (Array.isArray(res.data)) {
             dataArray = res.data;
           } else {
-            // Intentar extraer de propiedades comunes
             const obj = res.data as any;
-            if (Array.isArray(obj.casos)) {
-              dataArray = obj.casos;
-            } else if (Array.isArray(obj.data)) {
-              dataArray = obj.data;
-            } else if (Array.isArray(obj.items)) {
-              dataArray = obj.items;
-            } else {
-              console.warn('res.data no es un array y no se encontró una propiedad array:', res.data);
-              dataArray = [];
-            }
+            if (Array.isArray(obj.casos)) dataArray = obj.casos;
+            else if (Array.isArray(obj.data)) dataArray = obj.data;
+            else if (Array.isArray(obj.items)) dataArray = obj.items;
+            else dataArray = [];
           }
         }
         this.casos = dataArray;
-        this.debugInfo = `Se encontraron ${this.casos.length} casos`;
         this.cargando = false;
       },
       error: (err) => {
-        console.error('Error al cargar casos - Detalle completo:', err);
         this.error = err.error?.message || err.message || 'Error al cargar casos. Verifica que el backend esté corriendo.';
-        this.debugInfo = 'Error: ' + this.error;
         this.cargando = false;
-      },
+      }
     });
   }
 
-  limpiarFiltros() {
+  limpiarFiltros(): void {
     this.filtroForm.reset();
+    this.departamentos = [];
+    this.municipios = [];
     this.aplicarFiltros();
   }
 

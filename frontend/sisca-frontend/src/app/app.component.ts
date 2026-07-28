@@ -8,8 +8,9 @@ import { NgIf } from '@angular/common';
   standalone: true,
   imports: [RouterOutlet, RouterLink, NgIf],
   template: `
-    <nav *ngIf="auth.isAuthenticated()" style="display:flex; gap:1rem; padding:0.5rem; background:#eee;">
-      <a routerLink="/dashboard">Dashboard</a>
+    <nav *ngIf="auth.isAuthenticated()" style="display:flex; gap:1rem; padding:0.5rem; background:#eee; align-items:center;">
+      <!-- Dashboard solo para roles autorizados -->
+      <a *ngIf="puedeVerDashboard()" routerLink="/dashboard">Dashboard</a>
       <a routerLink="/casos">Casos</a>
       <a routerLink="/notificaciones">Notificaciones</a>
       <a routerLink="/perfil">Perfil</a>
@@ -33,5 +34,11 @@ export class AppComponent {
   logout() {
     this.auth.logout();
     this.router.navigate(['/login']);
+  }
+
+  // Método para determinar si el usuario puede ver el Dashboard
+  puedeVerDashboard(): boolean {
+    const rolesPermitidos = ['Administrador', 'SYMA', 'Gestión y Control SYMA', 'Gerencia'];
+    return rolesPermitidos.some(r => this.auth.hasRole(r));
   }
 }

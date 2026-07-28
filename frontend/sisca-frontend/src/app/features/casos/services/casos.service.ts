@@ -12,6 +12,12 @@ export interface FiltrosCasos {
   fechaDesde?: string;
   fechaHasta?: string;
   texto?: string;
+  // Nuevos filtros geográficos y de personal
+  region?: string | number;
+  departamento?: string | number;
+  municipio?: string | number;
+  tecnico?: string | number;   // ID del usuario que reportó
+  brigada?: string | number;   // ID de la brigada reportante
 }
 
 @Injectable({ providedIn: 'root' })
@@ -31,7 +37,6 @@ export class CasosService {
     return this.http.get<ApiResponse<Caso[]>>(`${environment.apiUrl}/casos`, { params });
   }
 
-  // IMPORTANTE: El backend devuelve { caso: Caso } dentro de data
   obtenerCaso(id: number): Observable<ApiResponse<{ caso: Caso }>> {
     return this.http.get<ApiResponse<{ caso: Caso }>>(`${environment.apiUrl}/casos/${id}`);
   }
